@@ -1407,6 +1407,9 @@
         const DEBUG_MODE = true; // Set to false to disable all debug logging
         function log_(...args) { if (DEBUG_MODE) console.log('[DEBUG]', ...args); }
         
+        // Force performance logs to always show (bypass DEBUG_MODE)
+        console.log('[INIT] Performance logging enabled - you should see timing logs in console');
+        
         // Set your Apps Script Web App URL here after deployment        
         const API_URL = 'https://script.google.com/macros/s/AKfycbyW40fwAmnmvkRzcDYMgRyInG86IvL8qia3hoNq5pC2WPG3FZH29ju6w-HCk-xyibAT/exec';                         
         const HAS_SERVER = !!API_URL;
@@ -1574,23 +1577,23 @@
         const service = HAS_SERVER ? {
             getSession: (arg) => retryWithBackoff(async () => {
                 const t0 = performance.now();
-                log_(`[PERF→FRONT] getSession START`);
+                console.log(`[PERF→FRONT] getSession START`);
                 const t1 = performance.now();
                 const payload = JSON.stringify({action: 'getSession', ...arg});
-                log_(`[PERF→FRONT] JSON.stringify ${Math.round(performance.now()-t1)}ms`);
+                console.log(`[PERF→FRONT] JSON.stringify ${Math.round(performance.now()-t1)}ms`);
                 const t2 = performance.now();
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: payload
                 });
-                log_(`[PERF→FRONT] fetch() ${Math.round(performance.now()-t2)}ms`);
+                console.log(`[PERF→FRONT] fetch() ${Math.round(performance.now()-t2)}ms`);
                 const t3 = performance.now();
                 const result = await response.json();
-                log_(`[PERF→FRONT] response.json() ${Math.round(performance.now()-t3)}ms`);
+                console.log(`[PERF→FRONT] response.json() ${Math.round(performance.now()-t3)}ms`);
                 const size = JSON.stringify(result).length;
-                log_(`[PERF→FRONT] getSession TOTAL ${Math.round(performance.now()-t0)}ms`);
-                log_(`[FRONT←BACK] getSession ${(size/1024).toFixed(1)}KB ${Math.round(performance.now()-t0)}ms`);
+                console.log(`[PERF→FRONT] getSession TOTAL ${Math.round(performance.now()-t0)}ms`);
+                console.log(`[FRONT←BACK] getSession ${(size/1024).toFixed(1)}KB ${Math.round(performance.now()-t0)}ms`);
                 if (result === null || result === undefined) {
                     throw new Error('Server returned null');
                 }
