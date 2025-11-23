@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>My Web App</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      /* <--- NO PADDING HERE */
+      background: #fafafa;
+      font-family: system-ui, Arial, sans-serif;
+      overflow: hidden;
+    }
+
+    .iframe-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      padding-top: 24px;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      /* The Knife: Cuts off the Google Banner */
+      margin-top: -24px;
+      height: calc(100% + 24px);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="iframe-container">
+    <iframe id="appFrame"
+      src="https://script.google.com/macros/s/AKfycbyW40fwAmnmvkRzcDYMgRyInG86IvL8qia3hoNq5pC2WPG3FZH29ju6w-HCk-xyibAT/exec"
+      title="FSRS Quiz" allow="autoplay"></iframe>
+  </div>
+  <script>
+    const iframe = document.getElementById('appFrame');
+    let checkCount = 0;
+    const maxChecks = 10;
+    
+    function checkForError() {
+      if (checkCount >= maxChecks) return;
+      checkCount++;
+      
+      try {
+        const doc = iframe.contentDocument || iframe.contentWindow.document;
+        const text = doc.body?.innerText || '';
+        
+        if (text.includes('unavailable') || text.includes('heavy traffic') || text.includes('Try again')) {
+          console.log('Detected Google error, reloading...');
+          iframe.src = iframe.src;
+          checkCount = 0;
+        }
+      } catch (e) {
+        // Cross-origin, can't check - assume loaded
+      }
+    }
+    
+    iframe.addEventListener('load', () => {
+      setTimeout(checkForError, 500);
+      setTimeout(checkForError, 1500);
+    });
+  </script>
+</body>
+
+</html>
