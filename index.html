@@ -1757,6 +1757,9 @@
         }
 
         let _audioEl = new Audio();
+        _audioEl.id = "audio";
+        _audioEl.style.display = "none";           // hide but keep active
+        document.body.appendChild(_audioEl);       // <<< IMPORTANT        
         let _audioSrc = '';
         let _audioEnabled = false;
         let _audioAllowed = false;
