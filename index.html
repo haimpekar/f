@@ -1315,6 +1315,11 @@
 
 
     <script>
+        const _audioEl = document.createElement('audio');
+        _audioEl.id = 'audio';
+        _audioEl.style.display = 'none';
+        document.body.appendChild(_audioEl);
+
         function $(id) { return document.getElementById(id); }
         function showError_(msg) {
             const sb = $('statusBarText'), fb = $('feedback');
@@ -1756,10 +1761,6 @@
             }
         }
 
-        let _audioEl = new Audio();
-        _audioEl.id = "audio";
-        _audioEl.style.display = "none";           // hide but keep active
-        document.body.appendChild(_audioEl);       // <<< IMPORTANT        
         let _audioSrc = '';
         let _audioEnabled = false;
         let _audioAllowed = false;
