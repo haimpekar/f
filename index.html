@@ -1315,27 +1315,38 @@
 
 
     <script>
-        const _audioEl = document.createElement('audio');
-        _audioEl.id = 'audio';
-        _audioEl.style.display = 'none';
-        document.body.appendChild(_audioEl);
+        let _audioEl = null;
+        
+        // Create audio element after DOM is ready
+        function initAudioElement() {
+            if (!_audioEl) {
+                _audioEl = document.createElement('audio');
+                _audioEl.id = 'audio';
+                _audioEl.style.display = 'none';
+                document.body.appendChild(_audioEl);
+                console.log('[Audio] Element created and appended to body');
+            }
+            return _audioEl;
+        }
         
         // DEBUG: Expose audio variables to console
         window.debugAudio = () => {
-            console.log('Audio Element:', _audioEl);
+            const audio = _audioEl || initAudioElement();
+            console.log('Audio Element:', audio);
             console.log('Audio Enabled:', _audioEnabled);
             console.log('Current URL:', _currentAudioUrl);
-            console.log('Audio Src:', _audioEl.src);
-            console.log('Audio Paused:', _audioEl.paused);
-            console.log('Audio Ready State:', _audioEl.readyState);
-            return { _audioEl, _audioEnabled, _currentAudioUrl };
+            console.log('Audio Src:', audio.src);
+            console.log('Audio Paused:', audio.paused);
+            console.log('Audio Ready State:', audio.readyState);
+            return { _audioEl: audio, _audioEnabled, _currentAudioUrl };
         };
         
         window.testAudio = (url) => {
+            const audio = _audioEl || initAudioElement();
             const testUrl = url || 'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=he&q=test';
             console.log('Testing audio with URL:', testUrl);
-            _audioEl.src = testUrl;
-            return _audioEl.play().then(() => {
+            audio.src = testUrl;
+            return audio.play().then(() => {
                 console.log('✓ Audio played successfully');
                 return true;
             }).catch(err => {
@@ -1345,30 +1356,6 @@
         };
 
         function $(id) { return document.getElementById(id); }
-        
-        // Update debug helper after variables are defined
-        window.debugAudio = () => {
-            console.log('Audio Element:', _audioEl);
-            console.log('Audio Enabled:', _audioEnabled);
-            console.log('Current URL:', _currentAudioUrl);
-            console.log('Audio Src:', _audioEl.src);
-            console.log('Audio Paused:', _audioEl.paused);
-            console.log('Audio Ready State:', _audioEl.readyState);
-            return { _audioEl, _audioEnabled, _currentAudioUrl };
-        };
-        
-        window.testAudio = (url) => {
-            const testUrl = url || 'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=he&q=test';
-            console.log('Testing audio with URL:', testUrl);
-            _audioEl.src = testUrl;
-            return _audioEl.play().then(() => {
-                console.log('✓ Audio played successfully');
-                return true;
-            }).catch(err => {
-                console.error('✗ Audio play failed:', err.name, '-', err.message);
-                return false;
-            });
-        };
         function showError_(msg) {
             const sb = $('statusBarText'), fb = $('feedback');
             if (sb) sb.textContent = `Error: ${String(msg || 'Unknown error')}`;
@@ -1896,18 +1883,19 @@
         async function playAudioUrl(url) {
             if (!url) return false;
             
+            const audio = _audioEl || initAudioElement();
             const requestId = ++_audioRequestId;
             
             try { 
-                _audioEl.pause();
-                _audioEl.currentTime = 0;
+                audio.pause();
+                audio.currentTime = 0;
             } catch {}
             
             try {
                 if (requestId !== _audioRequestId) return false;
                 
                 log_('[Audio] Playing URL:', url);
-                _audioEl.src = url;
+                audio.src = url;
                 
                 let rate = 1;
                 try {
@@ -1924,11 +1912,11 @@
                     rate = 1;
                 }
                 
-                _audioEl.playbackRate = rate;
+                audio.playbackRate = rate;
                 
                 if (requestId !== _audioRequestId) return false;
                 
-                await _audioEl.play();
+                await audio.play();
                 log_('[Audio] Playing successfully');
                 _audioSrc = url;
                 
@@ -1983,12 +1971,15 @@
                 _audioEnabled = !_audioEnabled;
 
                 // Stop audio if turning off
-                if (!_audioEnabled && _audioEl && !_audioEl.paused) {
-                    try {
-                        _audioEl.pause();
-                        _audioEl.currentTime = 0;
-                    } catch (e) {
-                        log_('failed to stop audio', e);
+                if (!_audioEnabled) {
+                    const audio = _audioEl || initAudioElement();
+                    if (audio && !audio.paused) {
+                        try {
+                            audio.pause();
+                            audio.currentTime = 0;
+                        } catch (e) {
+                            log_('failed to stop audio', e);
+                        }
                     }
                 }
 
@@ -2362,10 +2353,11 @@
 
         function renderTestQuestion() {
             // Stop any playing audio
-            if (_audioEl && !_audioEl.ended && !_audioEl.paused) {
+            const audio = _audioEl || initAudioElement();
+            if (audio && !audio.ended && !audio.paused) {
                 try {
-                    _audioEl.pause();
-                    _audioEl.currentTime = 0;
+                    audio.pause();
+                    audio.currentTime = 0;
                 } catch (e) {
                     log_('Failed to stop audio:', e);
                 }
@@ -3208,9 +3200,10 @@
 
         function stopAudio() {
             _audioRequestId++;
+            const audio = _audioEl || initAudioElement();
             try {
-                _audioEl.pause();
-                _audioEl.currentTime = 0;
+                audio.pause();
+                audio.currentTime = 0;
             } catch (e) {}
         }
 
@@ -3530,9 +3523,10 @@
         function goNext() {
             // Stop any playing audio
             _audioRequestId++;
+            const audio = _audioEl || initAudioElement();
             try {
-                _audioEl.pause();
-                _audioEl.currentTime = 0;
+                audio.pause();
+                audio.currentTime = 0;
             } catch (e) {}
             
             payload.state.currentIndex = decideNextIndex();
@@ -3604,6 +3598,8 @@
 
         // ---------- Startup wiring ----------
         window.addEventListener('DOMContentLoaded', () => {
+            // Initialize audio element first
+            initAudioElement();
             // Login modal handlers
             const loginBtn = $('loginBtn');
             const loginEmail = $('loginEmail');
