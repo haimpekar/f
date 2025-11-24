@@ -1319,8 +1319,56 @@
         _audioEl.id = 'audio';
         _audioEl.style.display = 'none';
         document.body.appendChild(_audioEl);
+        
+        // DEBUG: Expose audio variables to console
+        window.debugAudio = () => {
+            console.log('Audio Element:', _audioEl);
+            console.log('Audio Enabled:', _audioEnabled);
+            console.log('Current URL:', _currentAudioUrl);
+            console.log('Audio Src:', _audioEl.src);
+            console.log('Audio Paused:', _audioEl.paused);
+            console.log('Audio Ready State:', _audioEl.readyState);
+            return { _audioEl, _audioEnabled, _currentAudioUrl };
+        };
+        
+        window.testAudio = (url) => {
+            const testUrl = url || 'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=he&q=test';
+            console.log('Testing audio with URL:', testUrl);
+            _audioEl.src = testUrl;
+            return _audioEl.play().then(() => {
+                console.log('✓ Audio played successfully');
+                return true;
+            }).catch(err => {
+                console.error('✗ Audio play failed:', err.name, '-', err.message);
+                return false;
+            });
+        };
 
         function $(id) { return document.getElementById(id); }
+        
+        // Update debug helper after variables are defined
+        window.debugAudio = () => {
+            console.log('Audio Element:', _audioEl);
+            console.log('Audio Enabled:', _audioEnabled);
+            console.log('Current URL:', _currentAudioUrl);
+            console.log('Audio Src:', _audioEl.src);
+            console.log('Audio Paused:', _audioEl.paused);
+            console.log('Audio Ready State:', _audioEl.readyState);
+            return { _audioEl, _audioEnabled, _currentAudioUrl };
+        };
+        
+        window.testAudio = (url) => {
+            const testUrl = url || 'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=he&q=test';
+            console.log('Testing audio with URL:', testUrl);
+            _audioEl.src = testUrl;
+            return _audioEl.play().then(() => {
+                console.log('✓ Audio played successfully');
+                return true;
+            }).catch(err => {
+                console.error('✗ Audio play failed:', err.name, '-', err.message);
+                return false;
+            });
+        };
         function showError_(msg) {
             const sb = $('statusBarText'), fb = $('feedback');
             if (sb) sb.textContent = `Error: ${String(msg || 'Unknown error')}`;
