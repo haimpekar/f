@@ -1661,18 +1661,7 @@
                 log_(`[FRONT→BACK] saveSession(${payload.saveType}) ${answered} ${(size/1024).toFixed(1)}KB ${Math.round(performance.now()-t0)}ms`);
                 return result;
             }),
-            fetchAudio: (url) => retryWithBackoff(async () => {
-                const t0 = performance.now();
-                const response = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({action: 'fetchAudio', url})
-                });
-                const result = await response.json();
-                const size = result.success ? result.data.length : 0;
-                log_(`[FRONT←BACK] fetchAudio ${(size/1024).toFixed(1)}KB ${Math.round(performance.now()-t0)}ms`);
-                return result;
-            })
+
         } : {
             _lastSaved: null,
             async getSession(arg) {
@@ -1805,58 +1794,6 @@
         let _audioAllowed = false;
         let _currentAudioUrl = '';
         let _audioRequestId = 0;
-        
-        // IndexedDB audio cache
-        let _audioCache = null;
-        
-        async function initAudioCache() {
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open('AudioCache', 1);
-                request.onerror = () => reject(request.error);
-                request.onsuccess = () => {
-                    _audioCache = request.result;
-                    resolve(_audioCache);
-                };
-                request.onupgradeneeded = (e) => {
-                    const db = e.target.result;
-                    if (!db.objectStoreNames.contains('audio')) {
-                        db.createObjectStore('audio', { keyPath: 'url' });
-                    }
-                };
-            });
-        }
-        
-        async function getCachedAudio(url) {
-            if (!_audioCache) await initAudioCache();
-            return new Promise((resolve, reject) => {
-                const tx = _audioCache.transaction(['audio'], 'readonly');
-                const store = tx.objectStore('audio');
-                const request = store.get(url);
-                request.onerror = () => reject(request.error);
-                request.onsuccess = () => resolve(request.result);
-            });
-        }
-        
-        async function setCachedAudio(url, base64Data, mimeType) {
-            if (!_audioCache) await initAudioCache();
-            return new Promise((resolve, reject) => {
-                const tx = _audioCache.transaction(['audio'], 'readwrite');
-                const store = tx.objectStore('audio');
-                const request = store.put({ url, base64Data, mimeType, timestamp: Date.now() });
-                request.onerror = () => reject(request.error);
-                request.onsuccess = () => resolve();
-            });
-        }
-        
-        async function fetchAndCacheAudio(url) {
-            if (!HAS_SERVER) throw new Error('Caching only available in server mode');
-            
-            const result = await service.fetchAudio(url);
-            if (!result.success) throw new Error(result.error);
-            
-            await setCachedAudio(url, result.data, result.mimeType);
-            return { base64Data: result.data, mimeType: result.mimeType };
-        }
 
         function initAudioStateFromSettings() {
             try {
@@ -2606,16 +2543,6 @@
             testState = null;
         }
         
-        async function initializeAudioCache() {
-            try {
-                await initAudioCache();
-            } catch (e) {
-                log_('Failed to initialize audio cache:', e);
-            }
-        }
-
-
-
         async function loadSession() {
             log_('[loadSession] START email=' + currentCredentials.email);
             const sessionArg = { 
@@ -2685,8 +2612,6 @@
         async function boot(cachedSession = null) {
             const t0 = performance.now();
             log_('[boot] START');
-            
-            await initializeAudioCache();
             
             if (!currentCredentials || !currentCredentials.email || !currentCredentials.password) {
                 log_('[boot] No credentials, showing login');
