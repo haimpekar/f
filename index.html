@@ -1315,23 +1315,25 @@
 
 
     <script>
+        // Audio element and initialization (outside DOMContentLoaded)
         let _audioEl = null;
         
-        // Create audio element after DOM is ready
         function initAudioElement() {
             if (!_audioEl) {
                 _audioEl = document.createElement('audio');
                 _audioEl.id = 'audio';
                 _audioEl.style.display = 'none';
-                document.body.appendChild(_audioEl);
-                console.log('[Audio] Element created and appended to body');
+                if (document.body) {
+                    document.body.appendChild(_audioEl);
+                    console.log('[Audio] Element created and appended to body');
+                } else {
+                    console.warn('[Audio] Body not ready, will append later');
+                }
             }
             return _audioEl;
         }
 
-        function $(id) { return document.getElementById(id); }
-        
-        // DEBUG: Expose audio variables to console (MUST be outside DOMContentLoaded)
+        // Debug functions (outside DOMContentLoaded for console access)
         window.debugAudio = () => {
             const audio = _audioEl || initAudioElement();
             console.log('Audio Element:', audio);
@@ -1356,6 +1358,8 @@
                 return false;
             });
         };
+
+        function $(id) { return document.getElementById(id); }
         function showError_(msg) {
             const sb = $('statusBarText'), fb = $('feedback');
             if (sb) sb.textContent = `Error: ${String(msg || 'Unknown error')}`;
@@ -3598,8 +3602,10 @@
 
         // ---------- Startup wiring ----------
         window.addEventListener('DOMContentLoaded', () => {
-            // Initialize audio element first
-            initAudioElement();
+            // Ensure audio element is created now that DOM is ready
+            if (!_audioEl || !_audioEl.parentElement) {
+                initAudioElement();
+            }
             // Login modal handlers
             const loginBtn = $('loginBtn');
             const loginEmail = $('loginEmail');
