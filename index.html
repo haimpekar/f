@@ -1416,8 +1416,8 @@
         // Force performance logs to always show (bypass DEBUG_MODE)
         console.log('[INIT] Performance logging enabled - you should see timing logs in console');
         
-        // Set your Apps Script Web App URL here after deployment        
-        const API_URL = 'https://script.google.com/macros/s/AKfycbyW40fwAmnmvkRzcDYMgRyInG86IvL8qia3hoNq5pC2WPG3FZH29ju6w-HCk-xyibAT/exec';                         
+        // Cloudflare Worker URL (proxies to Apps Script)
+        const API_URL = 'https://fsrs.haim-pekar.workers.dev/';                         
         const HAS_SERVER = !!API_URL;
         const IS_MOCK = !HAS_SERVER; // single source of truth for mode
         
