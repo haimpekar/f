@@ -1844,37 +1844,19 @@
         async function playAudioUrl(url) {
             if (!url) return false;
             
-            // Increment request ID to invalidate previous requests
             const requestId = ++_audioRequestId;
             
-            // Stop current audio immediately
             try { 
                 _audioEl.pause();
                 _audioEl.currentTime = 0;
             } catch {}
             
             try {
-                // DISABLED: Base64 caching approach - using direct URL instead
-                // if (HAS_SERVER) {
-                //     try {
-                //         const cached = await getCachedAudio(url);
-                //         if (cached && cached.base64Data) {
-                //             audioSrc = `data:${cached.mimeType};base64,${cached.base64Data}`;
-                //         } else {
-                //             const { base64Data, mimeType } = await fetchAndCacheAudio(url);
-                //             audioSrc = `data:${mimeType};base64,${base64Data}`;
-                //         }
-                //     } catch (e) {
-                //         audioSrc = url;
-                //     }
-                // }
-                
-                // Check if this request is still current
                 if (requestId !== _audioRequestId) return false;
                 
-                _audioEl.src = url; // Direct URL, no base64 needed
+                log_('[Audio] Playing URL:', url);
+                _audioEl.src = url;
                 
-                // Calculate playback speed based on term length
                 let rate = 1;
                 try {
                     const currentIndex = payload?.state?.currentIndex;
@@ -1882,12 +1864,7 @@
                         const C = payload.schema.lexiconCols;
                         const row = payload.items[currentIndex];
                         const term = String(row[C.term] || '').trim();
-                        // Use speed 1.0 for short words (5 chars or less), otherwise use user setting
-                        if (term.length <= 5) {
-                            rate = 1;
-                        } else {
-                            rate = Number(getSetting('PlaybackSpeed')) || 1.5;
-                        }
+                        rate = term.length <= 5 ? 1 : (Number(getSetting('PlaybackSpeed')) || 1.5);
                     } else {
                         rate = Number(getSetting('PlaybackSpeed')) || 1.5;
                     }
@@ -1897,14 +1874,15 @@
                 
                 _audioEl.playbackRate = rate;
                 
-                // Check again before playing
                 if (requestId !== _audioRequestId) return false;
                 
                 await _audioEl.play();
+                log_('[Audio] Playing successfully');
                 _audioSrc = url;
                 
                 return true;
             } catch (e) {
+                log_('[Audio] Play failed:', e.message);
                 return false;
             }
         }
@@ -3214,30 +3192,27 @@
                 const audioBtn = $('audioBtn');
                 const qEl = $('termText');
 
-                // Reset audio button styling
                 if (audioBtn) audioBtn.classList.remove('audio-only-mode');
 
                 if (isAudioOnly && hasAudio) {
-                    // Hide term text and show large audio button
                     if (qEl) qEl.style.display = 'none';
                     if (audioBtn) audioBtn.classList.add('audio-only-mode');
-                    // Force audio enabled in AudioOnly mode
                     _audioEnabled = true;
-                    log_('[AudioOnly] Forcing audio enabled, URL:', _currentAudioUrl);
+                    log_('[Audio] AudioOnly mode, URL:', _currentAudioUrl);
                 } else {
-                    // Normal mode - show term text
                     if (qEl) qEl.style.display = '';
                 }
 
                 updateAudioUIForCurrentRow(hasAudio);
                 
-                // Auto-play if audio enabled (forced in AudioOnly mode)
                 if (hasAudio && _audioEnabled) {
-                    log_('[AudioOnly] Auto-playing audio');
-                    playAudioUrl(_currentAudioUrl);
+                    log_('[Audio] Auto-playing...');
+                    playAudioUrl(_currentAudioUrl).then(success => {
+                        log_('[Audio] Auto-play result:', success);
+                    });
                 }
             } catch (e) {
-                log_('Audio configuration error', e);
+                log_('[Audio] Setup error:', e);
                 const audioBtn = $('audioBtn');
                 if (audioBtn) { audioBtn.hidden = false; audioBtn.disabled = true; }
             }
