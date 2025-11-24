@@ -1416,9 +1416,7 @@
         console.log('[INIT] Performance logging enabled - you should see timing logs in console');
         
         // Cloudflare Worker URL (proxies to Apps Script)
-        // DISABLED: Current approach using Cloudflare Worker proxy
-        // const API_URL = 'https://fsrs.haim-pekar.workers.dev/';
-        const API_URL = ''; // Disabled for now
+        const API_URL = 'https://fsrs.haim-pekar.workers.dev/';                         
         const HAS_SERVER = !!API_URL;
         const IS_MOCK = !HAS_SERVER; // single source of truth for mode
         
@@ -1856,26 +1854,25 @@
             } catch {}
             
             try {
-                let audioSrc = url;
-                
-                if (HAS_SERVER) {
-                    try {
-                        const cached = await getCachedAudio(url);
-                        if (cached && cached.base64Data) {
-                            audioSrc = `data:${cached.mimeType};base64,${cached.base64Data}`;
-                        } else {
-                            const { base64Data, mimeType } = await fetchAndCacheAudio(url);
-                            audioSrc = `data:${mimeType};base64,${base64Data}`;
-                        }
-                    } catch (e) {
-                        audioSrc = url;
-                    }
-                }
+                // DISABLED: Base64 caching approach - using direct URL instead
+                // if (HAS_SERVER) {
+                //     try {
+                //         const cached = await getCachedAudio(url);
+                //         if (cached && cached.base64Data) {
+                //             audioSrc = `data:${cached.mimeType};base64,${cached.base64Data}`;
+                //         } else {
+                //             const { base64Data, mimeType } = await fetchAndCacheAudio(url);
+                //             audioSrc = `data:${mimeType};base64,${base64Data}`;
+                //         }
+                //     } catch (e) {
+                //         audioSrc = url;
+                //     }
+                // }
                 
                 // Check if this request is still current
                 if (requestId !== _audioRequestId) return false;
                 
-                _audioEl.src = audioSrc;
+                _audioEl.src = url; // Direct URL, no base64 needed
                 
                 // Calculate playback speed based on term length
                 let rate = 1;
