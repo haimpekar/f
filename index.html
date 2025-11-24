@@ -3332,10 +3332,8 @@
 
             let firstRevealDone = false;
             const onFlip = () => {
-                const wasFlipped = card.classList.contains('is-flipped');
                 card.classList.toggle('is-flipped');
-
-                if (!wasFlipped && !firstRevealDone) {
+                if (!firstRevealDone) {
                     controls.hidden = false;
                     okBtn.disabled = false;
                     noBtn.disabled = false;
@@ -3343,7 +3341,6 @@
                 }
             };
             card.addEventListener('click', onFlip);
-            setTimeout(() => autoshrinkAll(), 0);
         }
 
         function renderTerm() {
