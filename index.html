@@ -1416,7 +1416,9 @@
         console.log('[INIT] Performance logging enabled - you should see timing logs in console');
         
         // Cloudflare Worker URL (proxies to Apps Script)
-        const API_URL = 'https://fsrs.haim-pekar.workers.dev/';                         
+        // DISABLED: Current approach using Cloudflare Worker proxy
+        // const API_URL = 'https://fsrs.haim-pekar.workers.dev/';
+        const API_URL = ''; // Disabled for now
         const HAS_SERVER = !!API_URL;
         const IS_MOCK = !HAS_SERVER; // single source of truth for mode
         
