@@ -1328,17 +1328,19 @@
             }
             return _audioEl;
         }
+
+        function $(id) { return document.getElementById(id); }
         
-        // DEBUG: Expose audio variables to console
+        // DEBUG: Expose audio variables to console (MUST be outside DOMContentLoaded)
         window.debugAudio = () => {
             const audio = _audioEl || initAudioElement();
             console.log('Audio Element:', audio);
-            console.log('Audio Enabled:', _audioEnabled);
-            console.log('Current URL:', _currentAudioUrl);
+            console.log('Audio Enabled:', typeof _audioEnabled !== 'undefined' ? _audioEnabled : 'not initialized');
+            console.log('Current URL:', typeof _currentAudioUrl !== 'undefined' ? _currentAudioUrl : 'not initialized');
             console.log('Audio Src:', audio.src);
             console.log('Audio Paused:', audio.paused);
             console.log('Audio Ready State:', audio.readyState);
-            return { _audioEl: audio, _audioEnabled, _currentAudioUrl };
+            return { audio, _audioEnabled, _currentAudioUrl };
         };
         
         window.testAudio = (url) => {
@@ -1354,8 +1356,6 @@
                 return false;
             });
         };
-
-        function $(id) { return document.getElementById(id); }
         function showError_(msg) {
             const sb = $('statusBarText'), fb = $('feedback');
             if (sb) sb.textContent = `Error: ${String(msg || 'Unknown error')}`;
