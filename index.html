@@ -1462,6 +1462,13 @@
         let testState = null; // { setName, shuffledIndices, currentIndex, score, startTime, totalQuestions }
         const DEBUG_MODE = true; // Set to false to disable all debug logging
         function log_(...args) { if (DEBUG_MODE) console.log('[DEBUG]', ...args); }
+        function logBackendDebug(entries, label) {
+            if (!Array.isArray(entries) || entries.length === 0) return;
+            const title = label ? `[BACKEND DEBUG ${label}]` : '[BACKEND DEBUG]';
+            console.groupCollapsed(title);
+            entries.forEach(line => console.log('[BACK]', line));
+            console.groupEnd();
+        }
         
         // Force performance logs to always show (bypass DEBUG_MODE)
         console.log('[INIT] Performance logging enabled - you should see timing logs in console');
@@ -1725,6 +1732,9 @@
                 const size = JSON.stringify(result).length;
                 console.log(`[PERF→FRONT] getSession TOTAL ${Math.round(performance.now()-t0)}ms`);
                 console.log(`[FRONT←BACK] getSession ${(size/1024).toFixed(1)}KB ${Math.round(performance.now()-t0)}ms`);
+                if (result && Array.isArray(result.debugLog) && result.debugLog.length) {
+                    logBackendDebug(result.debugLog, 'getSession');
+                }
                 if (result === null || result === undefined) {
                     throw new Error('Server returned null');
                 }
@@ -1741,6 +1751,9 @@
                 const result = await response.json();
                 const answered = payload?.data ? `answered=${_lastSavedAnswerCount}` : '';
                 log_(`[FRONT→BACK] saveSession(${payload.saveType}) ${answered} ${(size/1024).toFixed(1)}KB ${Math.round(performance.now()-t0)}ms`);
+                if (result && Array.isArray(result.debugLog) && result.debugLog.length) {
+                    logBackendDebug(result.debugLog, 'saveSession');
+                }
                 return result;
             }),
 
