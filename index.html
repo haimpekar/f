@@ -1460,8 +1460,10 @@
         console.log('[INIT] Performance logging enabled - you should see timing logs in console');
         
         // Cloudflare Worker URL (proxies to Apps Script)
-        const API_URL = 'https://fsrs.haim-pekar.workers.dev/';                         
-        const HAS_SERVER = !!API_URL;
+        const API_URL = 'https://fsrs.haim-pekar.workers.dev/';
+        // Auto-detect local file:// protocol and force mock mode
+        const IS_LOCAL = window.location.protocol === 'file:';
+        const HAS_SERVER = !!API_URL && !IS_LOCAL;
         const IS_MOCK = !HAS_SERVER; // single source of truth for mode
         
         function shuffleArray(array) {
@@ -2573,6 +2575,152 @@
             }
         }
 
+        function populateStudySetMenu(sess) {
+            const studySetList = $('studySetList');
+            if (!studySetList || !Array.isArray(sess.availableSets)) return;
+            
+            studySetList.innerHTML = '';
+            
+            if (sess.availableSets.length === 0) {
+                const msg = document.createElement('div');
+                msg.style.padding = '12px';
+                msg.style.color = '#666';
+                msg.style.fontSize = '14px';
+                msg.textContent = `Contact admin (${sess.adminEmail || 'administrator'}) to enable study sets`;
+                studySetList.appendChild(msg);
+                return;
+            }
+            
+            sess.availableSets.forEach(setName => {
+                const item = document.createElement('div');
+                item.className = 'submenu-item';
+                if (setName === sess.activeSet) item.classList.add('active');
+                
+                const label = document.createElement('span');
+                label.textContent = setName;
+                item.appendChild(label);
+                
+                if (setName === sess.activeSet) {
+                    const check = document.createElement('span');
+                    check.className = 'submenu-check';
+                    check.textContent = '✓';
+                    item.appendChild(check);
+                }
+                
+                item.onclick = async () => {
+                    if (setName === sess.activeSet) return;
+                    if (menuDropdown) menuDropdown.hidden = true;
+                    if (studySetSubmenu) studySetSubmenu.hidden = true;
+                    
+                    const sb = $('statusBarText');
+                    if (sb) sb.textContent = 'Switching set...';
+                    
+                    // Save progress if needed
+                    const saves = [];
+                    if (testState && testState.currentIndex > 0) saves.push(saveTestProgress());
+                    if (payload && payload.state && payload.state.answeredCount > 0) {
+                        const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
+                        const userProgress = payload.items.map(row => row.slice(cardWidth));
+                        saves.push(service.saveSession({ 
+                            userId: currentCredentials.email, 
+                            password: currentCredentials.password,
+                            activeSet: payload.activeSet,
+                            saveType: 'progress', 
+                            data: userProgress 
+                        }));
+                    }
+                    if (saves.length) await Promise.allSettled(saves);
+                    
+                    // Reset state before loading new set
+                    testState = null;
+                    payload = null;
+                    settings = [];
+                    _lastSavedAnswerCount = 0;
+                    
+                    // Clear cache for old set
+                    const oldCacheKey = `session_${currentCredentials.email}_${currentCredentials.setName || 'default'}`;
+                    localStorage.removeItem(oldCacheKey);
+                    
+                    // Load new set
+                    try {
+                        saveCredentials(currentCredentials.email, currentCredentials.password, setName);
+                        await boot();
+                    } catch (err) {
+                        showError_('Failed to switch set: ' + err);
+                    }
+                };
+                
+                studySetList.appendChild(item);
+            });
+        }
+        
+        function handleNoActiveSet(sess) {
+            const sb = $('statusBarText');
+            
+            if (!sess.availableSets || sess.availableSets.length === 0) {
+                if (sb) {
+                    const adminEmail = sess.adminEmail || 'administrator';
+                    sb.textContent = `Contact admin (${adminEmail}) to enable study sets`;
+                }
+            } else {
+                if (sb) {
+                    sb.textContent = 'Choose a study set from the menu (☰) to begin';
+                }
+            }
+            
+            $('quizArea').classList.add('hidden');
+            $('doneArea').classList.add('hidden');
+            
+            const hasAvailableSets = sess.availableSets && sess.availableSets.length > 0;
+            const studySetItem = $('studySetMenuItem');
+            if (studySetItem) {
+                if (hasAvailableSets) {
+                    studySetItem.style.opacity = '';
+                    studySetItem.style.pointerEvents = '';
+                } else {
+                    studySetItem.style.opacity = '0.5';
+                    studySetItem.style.pointerEvents = 'none';
+                }
+            }
+            
+            ['testModeMenuItem', 'suspendMenuItem', 'settingsMenuItem'].forEach(id => {
+                const el = $(id);
+                if (el) {
+                    el.style.opacity = '0.5';
+                    el.style.pointerEvents = 'none';
+                }
+            });
+        }
+        
+        function enableMenuItems(sess) {
+            const hasAvailableSets = sess.availableSets && sess.availableSets.length > 0;
+            const hasActiveSet = !!sess.activeSet;
+            
+            const studySetItem = $('studySetMenuItem');
+            if (studySetItem) {
+                if (hasAvailableSets) {
+                    studySetItem.style.opacity = '';
+                    studySetItem.style.pointerEvents = '';
+                } else {
+                    studySetItem.style.opacity = '0.5';
+                    studySetItem.style.pointerEvents = 'none';
+                }
+            }
+            
+            ['testModeMenuItem', 'suspendMenuItem', 'settingsMenuItem'].forEach(id => {
+                const el = $(id);
+                if (el) {
+                    if (hasActiveSet) {
+                        el.style.opacity = '';
+                        el.style.pointerEvents = '';
+                    } else {
+                        el.style.opacity = '0.5';
+                        el.style.pointerEvents = 'none';
+                    }
+                }
+            });
+        }
+
         function buildPayload(sess) {
             log_('[buildPayload] Building payload from session');
             log_('[buildPayload] Received userSettings:', JSON.stringify(sess.userSettings));
@@ -2623,7 +2771,55 @@
             const sb = $('statusBarText');
             if (sb) sb.textContent = 'Loading...';
             
+            // Try localStorage cache first
+            const cacheKey = `session_${currentCredentials.email}_${currentCredentials.setName || 'default'}`;
+            const cached = localStorage.getItem(cacheKey);
+            let cachedSess = null;
+            
+            if (cached && !cachedSession) {
+                try {
+                    cachedSess = JSON.parse(cached);
+                    log_('[boot] Found cached session, using immediately');
+                    if (sb) sb.textContent = 'Loading cached data...';
+                } catch (e) {
+                    log_('[boot] Cache parse failed:', e);
+                }
+            }
+            
             try {
+                // If we have cached data, show it immediately
+                if (cachedSess) {
+                    const sess = cachedSess;
+                    setupUserDisplay(sess);
+                    populateStudySetMenu(sess);
+                    
+                    if (!sess.activeSet) {
+                        handleNoActiveSet(sess);
+                        return;
+                    }
+                    
+                    enableMenuItems(sess);
+                    
+                    if (!Array.isArray(sess.cards) || !Array.isArray(sess.userProgress)) {
+                        throw new Error('Cached session is invalid');
+                    }
+                    
+                    payload = buildPayload(sess);
+                    settings = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
+                    renderSettingsUI({ settings });
+                    applyTheme();
+                    autoAdjustNewItemsPerDay();
+                    
+                    $('quizArea').classList.remove('hidden');
+                    $('doneArea').classList.add('hidden');
+                    initAudioStateFromSettings();
+                    
+                    log_('[boot] Cached data displayed, fetching fresh in background');
+                    if (sb) sb.textContent = 'Syncing...';
+                    goNext();
+                }
+                
+                // Always fetch fresh data in background
                 const sess = cachedSession || (log_('boot: calling service.getSession()'), await loadSession());
                 
                 // Display retry info if present
@@ -2635,157 +2831,44 @@
                     frontendRetryCount = 0;
                 }
                 
-                setupUserDisplay(sess);
+                // Update cache with fresh data
+                localStorage.setItem(cacheKey, JSON.stringify(sess));
+                log_('[boot] Cache updated with fresh data');
                 
-                // Populate study set submenu
-                const studySetList = $('studySetList');
-                if (studySetList && Array.isArray(sess.availableSets)) {
-                    studySetList.innerHTML = '';
-                    
-                    if (sess.availableSets.length === 0) {
-                        const msg = document.createElement('div');
-                        msg.style.padding = '12px';
-                        msg.style.color = '#666';
-                        msg.style.fontSize = '14px';
-                        msg.textContent = `Contact admin (${sess.adminEmail || 'administrator'}) to enable study sets`;
-                        studySetList.appendChild(msg);
+                // If we already showed cached data, check if anything changed
+                if (cachedSess) {
+                    const progressChanged = JSON.stringify(cachedSess.userProgress) !== JSON.stringify(sess.userProgress);
+                    if (progressChanged) {
+                        log_('[boot] Progress changed, updating UI');
+                        if (sb) sb.textContent = 'Updated from server';
+                        
+                        // Rebuild payload with fresh data
+                        payload = buildPayload(sess);
+                        settings = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
+                        renderSettingsUI({ settings });
+                        applyTheme();
+                        autoAdjustNewItemsPerDay();
+                        
+                        // Reset to first card with fresh data
+                        payload.state.currentIndex = -1;
+                        goNext();
                     } else {
-                    
-                    sess.availableSets.forEach(setName => {
-                        const item = document.createElement('div');
-                        item.className = 'submenu-item';
-                        if (setName === sess.activeSet) item.classList.add('active');
-                        
-                        const label = document.createElement('span');
-                        label.textContent = setName;
-                        item.appendChild(label);
-                        
-                        if (setName === sess.activeSet) {
-                            const check = document.createElement('span');
-                            check.className = 'submenu-check';
-                            check.textContent = '✓';
-                            item.appendChild(check);
-                        }
-                        
-                        item.onclick = async () => {
-                            if (setName === sess.activeSet) return;
-                            if (menuDropdown) menuDropdown.hidden = true;
-                            if (studySetSubmenu) studySetSubmenu.hidden = true;
-                            
-                            const sb = $('statusBarText');
-                            if (sb) sb.textContent = 'Switching set...';
-                            
-                            // Save progress if needed
-                            const saves = [];
-                            if (testState && testState.currentIndex > 0) saves.push(saveTestProgress());
-                            if (payload && payload.state && payload.state.answeredCount > 0) {
-                                const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
-                                const userProgress = payload.items.map(row => row.slice(cardWidth));
-                                saves.push(service.saveSession({ 
-                                    userId: currentCredentials.email, 
-                                    password: currentCredentials.password,
-                                    activeSet: payload.activeSet,
-                                    saveType: 'progress', 
-                                    data: userProgress 
-                                }));
-                            }
-                            if (saves.length) await Promise.allSettled(saves);
-                            
-                            // Reset state before loading new set
-                            testState = null;
-                            payload = null;
-                            settings = [];
-                            _lastSavedAnswerCount = 0;
-                            
-                            // Load new set by passing setName to getSession
-                            try {
-                                saveCredentials(currentCredentials.email, currentCredentials.password, setName);
-                                await boot();
-                            } catch (err) {
-                                showError_('Failed to switch set: ' + err);
-                            }
-                        };
-                        
-                        studySetList.appendChild(item);
-                    });
+                        log_('[boot] No changes detected');
+                        if (sb) updateSessionStats();
                     }
-                }
-                
-                // Handle empty activeSet (new user with no enabled sets)
-                if (!sess.activeSet) {
-                    const sb = $('statusBarText');
-                    
-                    if (!sess.availableSets || sess.availableSets.length === 0) {
-                        // No sets available - contact admin
-                        if (sb) {
-                            const adminEmail = sess.adminEmail || 'administrator';
-                            sb.textContent = `Contact admin (${adminEmail}) to enable study sets`;
-                        }
-                    } else {
-                        // Has sets but none selected - prompt to choose
-                        if (sb) {
-                            sb.textContent = 'Choose a study set from the menu (☰) to begin';
-                        }
-                    }
-                    
-                    // Hide quiz area
-                    $('quizArea').classList.add('hidden');
-                    $('doneArea').classList.add('hidden');
-                    
-                    // Enable study set menu if user has sets, disable others
-                    const hasAvailableSets = sess.availableSets && sess.availableSets.length > 0;
-                    const studySetItem = $('studySetMenuItem');
-                    if (studySetItem) {
-                        if (hasAvailableSets) {
-                            studySetItem.style.opacity = '';
-                            studySetItem.style.pointerEvents = '';
-                        } else {
-                            studySetItem.style.opacity = '0.5';
-                            studySetItem.style.pointerEvents = 'none';
-                        }
-                    }
-                    
-                    // Disable other menu items
-                    ['testModeMenuItem', 'suspendMenuItem', 'settingsMenuItem'].forEach(id => {
-                        const el = $(id);
-                        if (el) {
-                            el.style.opacity = '0.5';
-                            el.style.pointerEvents = 'none';
-                        }
-                    });
-                    
                     return;
                 }
                 
-                // Enable/disable menu items
-                const hasAvailableSets = sess.availableSets && sess.availableSets.length > 0;
-                const hasActiveSet = !!sess.activeSet;
+                // No cached data - show fresh data normally
+                setupUserDisplay(sess);
+                populateStudySetMenu(sess);
                 
-                // Study set menu enabled if user has available sets
-                const studySetItem = $('studySetMenuItem');
-                if (studySetItem) {
-                    if (hasAvailableSets) {
-                        studySetItem.style.opacity = '';
-                        studySetItem.style.pointerEvents = '';
-                    } else {
-                        studySetItem.style.opacity = '0.5';
-                        studySetItem.style.pointerEvents = 'none';
-                    }
+                if (!sess.activeSet) {
+                    handleNoActiveSet(sess);
+                    return;
                 }
                 
-                // Other items require an active set
-                ['testModeMenuItem', 'suspendMenuItem', 'settingsMenuItem'].forEach(id => {
-                    const el = $(id);
-                    if (el) {
-                        if (hasActiveSet) {
-                            el.style.opacity = '';
-                            el.style.pointerEvents = '';
-                        } else {
-                            el.style.opacity = '0.5';
-                            el.style.pointerEvents = 'none';
-                        }
-                    }
-                });
+                enableMenuItems(sess);
                 
                 if (!Array.isArray(sess.cards) || !Array.isArray(sess.userProgress)) {
                     log_('Session validation failed:', sess);
@@ -2812,7 +2895,7 @@
                 // Autoplay arming (once)
                 initAudioStateFromSettings();
                 log_('[boot] SUCCESS ' + Math.round(performance.now()-t0) + 'ms');
-                goNext();
+                if (!cachedSess) goNext();
             } catch (err) {
                 log_('boot: caught error', err);
                 log_('boot: error stack', err.stack);
