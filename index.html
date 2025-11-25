@@ -2637,9 +2637,7 @@
                     settings = [];
                     _lastSavedAnswerCount = 0;
                     
-                    // Clear cache for old set
-                    const oldCacheKey = `session_${currentCredentials.email}_${currentCredentials.setName || 'default'}`;
-                    localStorage.removeItem(oldCacheKey);
+                    // DON'T clear cache - keep all decks cached for instant switching
                     
                     // Load new set
                     try {
@@ -2757,6 +2755,62 @@
             };
         }
 
+        // IndexedDB cache wrapper
+        const DeckCache = {
+            dbName: 'fsrs_decks',
+            storeName: 'sessions',
+            db: null,
+            
+            async init() {
+                if (this.db) return this.db;
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(this.dbName, 1);
+                    request.onerror = () => reject(request.error);
+                    request.onsuccess = () => {
+                        this.db = request.result;
+                        resolve(this.db);
+                    };
+                    request.onupgradeneeded = (e) => {
+                        const db = e.target.result;
+                        if (!db.objectStoreNames.contains(this.storeName)) {
+                            db.createObjectStore(this.storeName);
+                        }
+                    };
+                });
+            },
+            
+            async get(key) {
+                try {
+                    await this.init();
+                    return new Promise((resolve, reject) => {
+                        const tx = this.db.transaction(this.storeName, 'readonly');
+                        const store = tx.objectStore(this.storeName);
+                        const request = store.get(key);
+                        request.onsuccess = () => resolve(request.result);
+                        request.onerror = () => reject(request.error);
+                    });
+                } catch (e) {
+                    log_('[DeckCache] get failed:', e);
+                    return null;
+                }
+            },
+            
+            async set(key, value) {
+                try {
+                    await this.init();
+                    return new Promise((resolve, reject) => {
+                        const tx = this.db.transaction(this.storeName, 'readwrite');
+                        const store = tx.objectStore(this.storeName);
+                        const request = store.put(value, key);
+                        request.onsuccess = () => resolve();
+                        request.onerror = () => reject(request.error);
+                    });
+                } catch (e) {
+                    log_('[DeckCache] set failed:', e);
+                }
+            }
+        };
+
         async function boot(cachedSession = null) {
             const t0 = performance.now();
             log_('[boot] START');
@@ -2771,18 +2825,19 @@
             const sb = $('statusBarText');
             if (sb) sb.textContent = 'Loading...';
             
-            // Try localStorage cache first
-            const cacheKey = `session_${currentCredentials.email}_${currentCredentials.setName || 'default'}`;
-            const cached = localStorage.getItem(cacheKey);
+            // Try IndexedDB cache first
+            const cacheKey = `${currentCredentials.email}_${currentCredentials.setName || 'default'}`;
             let cachedSess = null;
             
-            if (cached && !cachedSession) {
+            if (!cachedSession) {
                 try {
-                    cachedSess = JSON.parse(cached);
-                    log_('[boot] Found cached session, using immediately');
-                    if (sb) sb.textContent = 'Loading cached data...';
+                    cachedSess = await DeckCache.get(cacheKey);
+                    if (cachedSess) {
+                        log_('[boot] Found cached session in IndexedDB, using immediately');
+                        if (sb) sb.textContent = 'Loading cached data...';
+                    }
                 } catch (e) {
-                    log_('[boot] Cache parse failed:', e);
+                    log_('[boot] Cache read failed:', e);
                 }
             }
             
@@ -2831,8 +2886,8 @@
                     frontendRetryCount = 0;
                 }
                 
-                // Update cache with fresh data
-                localStorage.setItem(cacheKey, JSON.stringify(sess));
+                // Update cache with fresh data (IndexedDB)
+                DeckCache.set(cacheKey, sess).catch(e => log_('[boot] Cache write failed:', e));
                 log_('[boot] Cache updated with fresh data');
                 
                 // If we already showed cached data, check if anything changed
