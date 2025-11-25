@@ -1360,6 +1360,13 @@
         };
 
         function $(id) { return document.getElementById(id); }
+        function showToast(msg, type = 'info') {
+            const toast = document.createElement('div');
+            toast.textContent = msg;
+            toast.style.cssText = `position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:8px;font-size:14px;z-index:9999;${type === 'error' ? 'background:#d32f2f;color:#fff' : 'background:#333;color:#fff'}`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
+        }
         function showError_(msg) {
             const sb = $('statusBarText'), fb = $('feedback');
             if (sb) sb.textContent = `Error: ${String(msg || 'Unknown error')}`;
@@ -1531,6 +1538,7 @@
             if (errorDiv) {
                 errorDiv.textContent = message;
                 errorDiv.style.display = 'block';
+                errorDiv.style.color = '#a11';
                 errorDiv.style.whiteSpace = 'pre-line'; // Support multi-line messages
             }
         }
@@ -1550,6 +1558,14 @@
             if (email.startsWith("'") || password.startsWith("'")) {
                 showLoginError('Email and password cannot start with an apostrophe');
                 return null;
+            }
+            
+            // Show processing message
+            const errorDiv = $('loginError');
+            if (errorDiv) {
+                errorDiv.textContent = 'Processing...';
+                errorDiv.style.display = 'block';
+                errorDiv.style.color = '#666';
             }
             
             try {
@@ -1584,8 +1600,72 @@
         const AUTOSAVE_EVERY = 10;   // save after every 10 answers
         const MIN_REVIEW_INTERVAL_MS = 6 * 60 * 60 * 1000; // allow reviewing items due within 6 hours
         let _lastSavedAnswerCount = 0;
-        let _isSaving = false;
         const DISTRACTOR_KEYS = ['distractor1', 'distractor2', 'distractor3'];
+        
+        // Async save queue
+        const SaveQueue = {
+            queue: [],
+            processing: false,
+            
+            add(saveType, data) {
+                // Deduplicate: remove older saves of same type
+                if (saveType === 'progress' || saveType === 'settings') {
+                    this.queue = this.queue.filter(item => item.saveType !== saveType);
+                }
+                const item = { saveType, data, attempts: 0, timestamp: Date.now() };
+                this.queue.push(item);
+                localStorage.setItem('saveQueue', JSON.stringify(this.queue));
+                this.process();
+            },
+            
+            async process() {
+                if (this.processing || this.queue.length === 0) return;
+                this.processing = true;
+                
+                while (this.queue.length > 0) {
+                    const item = this.queue[0];
+                    try {
+                        await service.saveSession({
+                            userId: currentCredentials.email,
+                            password: currentCredentials.password,
+                            activeSet: payload?.activeSet,
+                            ...item.data
+                        });
+                        this.queue.shift();
+                        localStorage.setItem('saveQueue', JSON.stringify(this.queue));
+                        showToast(`Saved ${item.saveType}`);
+                    } catch (err) {
+                        item.attempts++;
+                        if (item.attempts >= 3) {
+                            log_('[SaveQueue] Failed after 3 attempts:', item.saveType);
+                            showToast(`Failed to save ${item.saveType}`, 'error');
+                            this.queue.shift();
+                        } else {
+                            log_(`[SaveQueue] Retry ${item.attempts}/3 for ${item.saveType}`);
+                            await new Promise(r => setTimeout(r, 1000 * item.attempts));
+                        }
+                        localStorage.setItem('saveQueue', JSON.stringify(this.queue));
+                    }
+                }
+                
+                this.processing = false;
+            },
+            
+            restore() {
+                try {
+                    const stored = localStorage.getItem('saveQueue');
+                    if (stored) {
+                        this.queue = JSON.parse(stored);
+                        if (this.queue.length > 0) {
+                            log_('[SaveQueue] Restored ' + this.queue.length + ' pending saves');
+                            this.process();
+                        }
+                    }
+                } catch (e) {
+                    log_('[SaveQueue] Restore failed:', e);
+                }
+            }
+        };
         
         function buildLexiconSchema(studySetSchema, userProgressSchema) {
             log_('[buildLexiconSchema] Building merged schema');
@@ -1708,34 +1788,17 @@
         };
 
         async function maybeAutosave_() {
-            try {
-                const answered = payload?.state?.answeredCount || 0;
-                if (answered - _lastSavedAnswerCount < AUTOSAVE_EVERY) return;
-                if (_isSaving) return;
-
-                // Update counter IMMEDIATELY to prevent duplicate saves
-                _lastSavedAnswerCount = answered;
-                _isSaving = true;
-                const sb = $('statusBarText');
-                const old = sb ? sb.textContent : '';
-                if (sb) sb.textContent = 'Autosaving…';
-
-                // Split items back into cards + userProgress
-                const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
-                const userProgress = payload.items.map(row => row.slice(cardWidth));
-                await service.saveSession({ 
-                    userId: currentCredentials.email, 
-                    password: currentCredentials.password,
-                    saveType: 'progress', 
-                    data: userProgress 
-                });
-
-                if (sb) sb.textContent = old || 'Ready';
-            } catch (err) {
-                log_('autosave failed', err);
-            } finally {
-                _isSaving = false;
-            }
+            const answered = payload?.state?.answeredCount || 0;
+            if (answered - _lastSavedAnswerCount < AUTOSAVE_EVERY) return;
+            
+            _lastSavedAnswerCount = answered;
+            const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
+            const userProgress = payload.items.map(row => row.slice(cardWidth));
+            
+            SaveQueue.add('progress', {
+                saveType: 'progress',
+                data: userProgress
+            });
         }
 
         function parseSettingOptions_(raw) {
@@ -2460,28 +2523,22 @@
         }
         
         async function saveTestProgress() {
-            try {
-                const d = testState.startTime;
-                const testDateTime = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
-                const questionsAnswered = testState.currentIndex;
-                const percentage = Math.round((testState.score / questionsAnswered) * 100);
-                const testSessionId = testState.sessionId;
-                
-                await service.saveSession({
-                    userId: currentCredentials.email, 
-                    password: currentCredentials.password,
-                    saveType: 'testResult',
-                    testData: {
-                        testDateTime,
-                        setName: testState.setName,
-                        questionsAnswered,
-                        percentage,
-                        testSessionId
-                    }
-                });
-            } catch (err) {
-                log_('Test progress save failed:', err);
-            }
+            const d = testState.startTime;
+            const testDateTime = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+            const questionsAnswered = testState.currentIndex;
+            const percentage = Math.round((testState.score / questionsAnswered) * 100);
+            const testSessionId = testState.sessionId;
+            
+            SaveQueue.add('testResult', {
+                saveType: 'testResult',
+                testData: {
+                    testDateTime,
+                    setName: testState.setName,
+                    questionsAnswered,
+                    percentage,
+                    testSessionId
+                }
+            });
         }
         
         async function exitTestMode() {
@@ -3614,17 +3671,13 @@
             const el = $('statusBarText');
             if (el) el.textContent = 'Done';
 
-            // Save in background
-            if (!_isSaving) {
-                const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
-                const userProgress = payload.items.map(row => row.slice(cardWidth));
-                service.saveSession({ 
-                    userId: currentCredentials.email, 
-                    password: currentCredentials.password,
-                    saveType: 'progress', 
-                    data: userProgress 
-                }).catch(e => log_('Background save failed:', e));
-            }
+            // Async save
+            const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
+            const userProgress = payload.items.map(row => row.slice(cardWidth));
+            SaveQueue.add('progress', {
+                saveType: 'progress',
+                data: userProgress
+            });
         }
 
         function queueMoreNewItems(batchSize = 5) {
@@ -3653,13 +3706,11 @@
                 renderTerm();
             }
             
-            service.saveSession({ 
-                userId: currentCredentials.email, 
-                password: currentCredentials.password,
-                activeSet: payload.activeSet,
-                saveType: 'settings', 
+            // Async save with optimistic UI
+            SaveQueue.add('settings', {
+                saveType: 'settings',
                 data: settings
-            }).catch(err => log_('Background settings save failed:', err));
+            });
         }
 
 
@@ -3851,26 +3902,20 @@
                         return;
                     }
                     
-                    feedbackSendBtn.disabled = true;
-                    feedbackSendBtn.textContent = 'Sending...';
-                    
                     const userId = currentCredentials?.email || 'unknown';
                     const currentSet = payload?.activeSet || '';
                     
                     // Show success immediately (optimistic UI)
                     feedbackModal.hidden = true;
-                    log_('Feedback sent successfully');
                     
-                    // Send in background
-                    service.saveSession({
+                    // Async save
+                    SaveQueue.add('feedback', {
                         saveType: 'feedback',
                         feedbackData: {
                             userId,
                             currentSet,
                             message
                         }
-                    }).catch(err => {
-                        log_('Background feedback send failed:', err);
                     });
                 });
             }
@@ -3900,15 +3945,13 @@
                     
                     suspendModal.hidden = true;
                     
-                    // Save in background
+                    // Async save
                     const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
                     const userProgress = payload.items.map(row => row.slice(cardWidth));
-                    service.saveSession({ 
-                        userId: currentCredentials.email, 
-                        password: currentCredentials.password,
-                        saveType: 'progress', 
-                        data: userProgress 
-                    }).catch(e => log_('Background suspend save failed:', e));
+                    SaveQueue.add('progress', {
+                        saveType: 'progress',
+                        data: userProgress
+                    });
                 });
             }
             
@@ -3956,6 +3999,9 @@
                     showLoginModal();
                 });
             }
+            
+            // Restore pending saves from previous session
+            SaveQueue.restore();
             
             // Try to auto-login with stored credentials, otherwise show login modal
             const stored = loadCredentials();
