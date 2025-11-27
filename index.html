@@ -576,7 +576,7 @@
 
         .settings-grid {
             display: grid;
-            grid-template-columns: auto auto;
+            grid-template-columns: auto 1fr;
             gap: 12px 16px;
             align-items: center;
         }
@@ -1179,6 +1179,10 @@
             <span class="menu-label">Send Feedback</span>
             <span class="menu-icon">💬</span>
         </div>
+        <div class="menu-item" id="changePasswordMenuItem">
+            <span class="menu-label">Change Password</span>
+            <span class="menu-icon">🔐</span>
+        </div>
         <div class="menu-item" id="logoutMenuItem">
             <span class="menu-label">Logout <span id="userIdDisplay"
                     style="font-size: 0.85em; color: #666;"></span></span>
@@ -1208,13 +1212,65 @@
                     <div class="control"><input id="loginEmail" type="email" placeholder="your@email.com"
                             style="width: 200px;"></div>
                     <div class="label">Password:</div>
-                    <div class="control"><input id="loginPassword" type="text" placeholder="password"
-                            style="width: 200px;"></div>
+                    <div class="control">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <input id="loginPassword" type="password" placeholder="password" style="width: 200px;">
+                            <button id="loginPwToggle" type="button" class="pw-toggle" aria-pressed="false"
+                                aria-label="Show password"
+                                style="background:none;border:0;font-size:16px;cursor:pointer;">👁️</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="settings-footer">
                     <button id="loginBtn" class="btn primary" type="button">Sign In</button>
                 </div>
                 <div id="loginError" class="error" style="margin-top: 10px; display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="changePasswordModal" class="modal" hidden>
+        <div class="modal-backdrop" aria-hidden="true"></div>
+        <div class="modal-card">
+            <div class="settings-wrap">
+                <div class="settings-head">
+                    <h3>Change Password</h3>
+                </div>
+                <div class="settings-grid">
+                    <div class="label">Current password</div>
+                    <div class="control">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <input id="cpCurrent" type="password" placeholder="Current password" style="width:200px;">
+                            <button id="cpCurrentToggle" type="button" class="pw-toggle" aria-pressed="false"
+                                aria-label="Show current password"
+                                style="background:none;border:0;font-size:16px;cursor:pointer;">👁️</button>
+                        </div>
+                    </div>
+                    <div class="label">New password</div>
+                    <div class="control">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <input id="cpNew" type="password" placeholder="New password" style="width:200px;">
+                            <button id="cpNewToggle" type="button" class="pw-toggle" aria-pressed="false"
+                                aria-label="Show new password"
+                                style="background:none;border:0;font-size:16px;cursor:pointer;">👁️</button>
+                        </div>
+                    </div>
+                    <div class="label">Confirm new</div>
+                    <div class="control">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <input id="cpConfirm" type="password" placeholder="Confirm new password"
+                                style="width:200px;">
+                            <button id="cpConfirmToggle" type="button" class="pw-toggle" aria-pressed="false"
+                                aria-label="Show confirm password"
+                                style="background:none;border:0;font-size:16px;cursor:pointer;">👁️</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="cpError" class="error" style="margin-top:10px; display:none;"></div>
+                <div class="settings-footer">
+                    <button id="changePasswordCancelBtn" class="btn" type="button">Cancel</button>
+                    <button id="changePasswordSaveBtn" class="btn primary" type="button">Save</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1681,6 +1737,34 @@
                         this.queue.shift();
                         localStorage.setItem('saveQueue', JSON.stringify(this.queue));
                         showToast(`Saved ${item.saveType}`);
+
+                        // Update local IndexedDB cache (DeckCache) so cached session
+                        // reflects the newly-saved settings/progress immediately.
+                        try {
+                            if (typeof DeckCache !== 'undefined' && currentCredentials && currentCredentials.email) {
+                                const cacheKey = `${currentCredentials.email}_${currentCredentials.setName || 'default'}`;
+
+                                // Build a lightweight session object compatible with the cached shape
+                                const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
+                                const sess = {
+                                    success: true,
+                                    userId: String(currentCredentials.email),
+                                    activeSet: payload?.activeSet || creds.activeSet || '',
+                                    availableSets: payload?.availableSets || [],
+                                    setSettings: payload?.setSettings || {},
+                                    cards: Array.isArray(payload?.items) ? payload.items.map(r => Array.isArray(r) ? r.slice(0, cardWidth) : []) : [],
+                                    userSettings: Array.isArray(settings) ? settings.map(r => Array.isArray(r) ? r.slice() : []) : (payload?.settings || []),
+                                    userProgress: Array.isArray(payload?.items) ? payload.items.map(r => Array.isArray(r) ? r.slice(cardWidth) : []) : [],
+                                    studySetSchema: payload?.schema || {},
+                                    userProgressSchema: payload?.userProgressSchema || {},
+                                    adminEmail: payload?.adminEmail || ''
+                                };
+
+                                DeckCache.set(cacheKey, sess).catch(e => log_('[DeckCache] set failed after save:', e));
+                            }
+                        } catch (e) {
+                            log_('Failed to update local cache after save:', e);
+                        }
                     } catch (err) {
                         item.attempts++;
                         if (item.attempts >= 3) {
@@ -1796,6 +1880,17 @@
                 }
                 return result;
             }),
+            changePassword: (payload) => retryWithBackoff(async () => {
+                const t0 = performance.now();
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'changePassword', ...payload })
+                });
+                const result = await response.json();
+                log_(`[FRONT→BACK] changePassword ${(result && result.success) ? 'OK' : 'FAIL'} ${Math.round(performance.now() - t0)}ms`);
+                return result;
+            }),
 
         } : {
             _lastSaved: null,
@@ -1836,6 +1931,17 @@
             },
             async saveSession(payload) {
                 this._lastSaved = payload;
+                return { success: true };
+            }
+            ,
+            async changePassword(arg) {
+                if (!arg || !arg.userId || !arg.currentPassword || !arg.newPassword) return { success: false, error: 'MISSING_FIELDS' };
+                const email = String(arg.userId).toLowerCase();
+                const cur = String(arg.currentPassword);
+                const nw = String(arg.newPassword);
+                if (!MOCK_CREDENTIALS[email]) return { success: false, error: 'USER_NOT_FOUND' };
+                if (MOCK_CREDENTIALS[email] !== cur) return { success: false, error: 'WRONG_PASSWORD' };
+                MOCK_CREDENTIALS[email] = nw;
                 return { success: true };
             }
         };
@@ -2243,13 +2349,36 @@
                         ctrl.type = 'number';
                         ctrl.value = String(value ?? '');
                     } else if (name === 'PlaybackSpeed') {
+                        // Render playback speed with centered numeric value ABOVE the slider
+                        const wrapper = document.createElement('div');
+                        wrapper.style.display = 'flex';
+                        wrapper.style.flexDirection = 'column';
+                        wrapper.style.alignItems = 'center';
+
+                        const valueEl = document.createElement('div');
+                        valueEl.style.textAlign = 'center';
+                        valueEl.style.marginBottom = '6px';
+                        valueEl.className = 'playback-value';
+
                         ctrl = document.createElement('input');
                         ctrl.type = 'range';
                         ctrl.min = '0.25';
                         ctrl.max = '4';
                         ctrl.step = '0.25';
                         ctrl.value = String(value ?? '1');
-                        ctrl.style.width = '150px';
+                        // Do not force full-width here; let the existing
+                        // `.settings-grid input` CSS rules control sizing so the
+                        // slider matches other controls exactly.
+                        ctrl.style.margin = '0';
+                        ctrl.style.padding = '0';
+
+                        // Put the numeric value above the slider in the center
+                        wrapper.appendChild(valueEl);
+                        wrapper.appendChild(ctrl);
+                        // Place wrapper into ctrlWrap instead of raw ctrl element
+                        ctrlWrap.appendChild(wrapper);
+                        // Mark ctrl as already appended so later code does not append again
+                        ctrl._appendedViaWrapper = true;
                     } else if (name === 'QuizMode' || name === 'ThemeLight' || name === 'AudioAutoPlay') {
                         ctrl = document.createElement('select');
                         const opts = [['true', 'Yes'], ['false', 'No']];
@@ -2286,7 +2415,10 @@
                                 ctrl.addEventListener('input', updateSettingValue);
                             }
                         }
-                        ctrlWrap.appendChild(ctrl);
+                        // If we already appended the ctrl inside a wrapper (PlaybackSpeed), skip appending here
+                        if (!ctrl._appendedViaWrapper) {
+                            ctrlWrap.appendChild(ctrl);
+                        }
                     }
 
                     const meta = document.createElement('div');
@@ -2296,6 +2428,28 @@
                     grid.appendChild(label);
                     grid.appendChild(ctrlWrap);
                     grid.appendChild(meta);
+
+                    // Show current numeric value for PlaybackSpeed ABOVE the slider and centered
+                    if (name === 'PlaybackSpeed' && ctrl) {
+                        try {
+                            const fmt = (v) => {
+                                const n = Number(v);
+                                if (!Number.isFinite(n)) return String(v);
+                                return n.toFixed(2).replace(/\.?(0+)$/, '').replace(/\.$/, '');
+                            };
+
+                            // Find the playback value element we created earlier (if any)
+                            const pv = ctrlWrap.querySelector('.playback-value');
+                            if (pv) {
+                                pv.textContent = `×${fmt(ctrl.value)}`;
+                                ctrl.addEventListener('input', () => {
+                                    pv.textContent = `×${fmt(ctrl.value)}`;
+                                });
+                            }
+                        } catch (e) {
+                            log_('Failed to attach PlaybackSpeed display', e);
+                        }
+                    }
                 }
                 syncAutoNewRate();
             } catch (e) {
@@ -3778,6 +3932,35 @@
             const loginBtn = $('loginBtn');
             const loginEmail = $('loginEmail');
             const loginPassword = $('loginPassword');
+            const loginPwToggle = $('loginPwToggle');
+
+            // Helper to attach a password visibility toggle to an input + button
+            function attachPwToggle(inputEl, toggleBtn) {
+                if (!inputEl || !toggleBtn) return;
+                const setState = (show) => {
+                    try {
+                        inputEl.type = show ? 'text' : 'password';
+                        toggleBtn.setAttribute('aria-pressed', show ? 'true' : 'false');
+                        toggleBtn.textContent = show ? '🙈' : '👁️';
+                    } catch (e) { /* ignore */ }
+                };
+                // Initialize state
+                setState(inputEl.type === 'text');
+
+                toggleBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const showing = toggleBtn.getAttribute('aria-pressed') === 'true';
+                    setState(!showing);
+                });
+
+                // Support toggling via keyboard (Space/Enter)
+                toggleBtn.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleBtn.click();
+                    }
+                });
+            }
 
             if (loginBtn) {
                 loginBtn.addEventListener('click', async () => {
@@ -3906,6 +4089,91 @@
                     $('settingsModal').hidden = false;
                 });
             }
+
+            // Change password menu item
+            const changePasswordMenuItem = $('changePasswordMenuItem');
+            const changePasswordModal = $('changePasswordModal');
+            const cpCurrent = $('cpCurrent');
+            const cpNew = $('cpNew');
+            const cpConfirm = $('cpConfirm');
+            const cpError = $('cpError');
+            const cpSaveBtn = $('changePasswordSaveBtn');
+            const cpCancelBtn = $('changePasswordCancelBtn');
+            const cpCurrentToggle = $('cpCurrentToggle');
+            const cpNewToggle = $('cpNewToggle');
+            const cpConfirmToggle = $('cpConfirmToggle');
+
+            // Attach reveal toggles to login and change-password inputs
+            try {
+                attachPwToggle(loginPassword, loginPwToggle);
+                attachPwToggle(cpCurrent, cpCurrentToggle);
+                attachPwToggle(cpNew, cpNewToggle);
+                attachPwToggle(cpConfirm, cpConfirmToggle);
+            } catch (e) {
+                log_('attachPwToggle failed', e);
+            }
+
+            if (changePasswordMenuItem) {
+                changePasswordMenuItem.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (menuDropdown) menuDropdown.hidden = true;
+                    closeAllSubmenus();
+                    if (!currentCredentials || !currentCredentials.email) {
+                        showLoginModal();
+                        return;
+                    }
+                    if (cpCurrent) cpCurrent.value = '';
+                    if (cpNew) cpNew.value = '';
+                    if (cpConfirm) cpConfirm.value = '';
+                    if (cpError) { cpError.style.display = 'none'; cpError.textContent = ''; }
+                    if (changePasswordModal) changePasswordModal.hidden = false;
+                    setTimeout(() => cpCurrent?.focus(), 50);
+                });
+            }
+
+            if (cpCancelBtn) cpCancelBtn.addEventListener('click', () => {
+                if (changePasswordModal) changePasswordModal.hidden = true;
+            });
+
+            if (cpSaveBtn) cpSaveBtn.addEventListener('click', async () => {
+                try {
+                    if (!currentCredentials || !currentCredentials.email) {
+                        if (cpError) { cpError.textContent = 'Not logged in'; cpError.style.display = 'block'; }
+                        return;
+                    }
+                    const cur = cpCurrent?.value || '';
+                    const nw = cpNew?.value || '';
+                    const conf = cpConfirm?.value || '';
+                    if (!cur || !nw || !conf) {
+                        if (cpError) { cpError.textContent = 'Fill all fields'; cpError.style.display = 'block'; }
+                        return;
+                    }
+                    if (nw !== conf) {
+                        if (cpError) { cpError.textContent = 'New passwords do not match'; cpError.style.display = 'block'; }
+                        return;
+                    }
+                    if (nw.length < 6) {
+                        if (cpError) { cpError.textContent = 'Password too short (min 6)'; cpError.style.display = 'block'; }
+                        return;
+                    }
+
+                    cpSaveBtn.disabled = true;
+                    const resp = await service.changePassword({ userId: currentCredentials.email, currentPassword: cur, newPassword: nw });
+                    cpSaveBtn.disabled = false;
+                    if (resp && resp.success) {
+                        // Update local stored credentials
+                        saveCredentials(currentCredentials.email, nw, currentCredentials.setName);
+                        if (changePasswordModal) changePasswordModal.hidden = true;
+                        showToast('Password changed', 'info');
+                    } else {
+                        const err = resp && resp.error ? resp.error : 'UNKNOWN_ERROR';
+                        if (cpError) { cpError.textContent = String(err); cpError.style.display = 'block'; }
+                    }
+                } catch (e) {
+                    cpSaveBtn.disabled = false;
+                    if (cpError) { cpError.textContent = String(e.message || e); cpError.style.display = 'block'; }
+                }
+            });
 
             // Feedback modal handlers
             const feedbackMenuItem = $('feedbackMenuItem');
