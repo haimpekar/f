@@ -4148,6 +4148,11 @@
                         if (cpError) { cpError.textContent = 'Fill all fields'; cpError.style.display = 'block'; }
                         return;
                     }
+                    // Disallow leading apostrophe to avoid Sheets format issues
+                    if (cur.startsWith("'") || nw.startsWith("'") || conf.startsWith("'")) {
+                        if (cpError) { cpError.textContent = "Passwords cannot start with an apostrophe (')"; cpError.style.display = 'block'; }
+                        return;
+                    }
                     if (nw !== conf) {
                         if (cpError) { cpError.textContent = 'New passwords do not match'; cpError.style.display = 'block'; }
                         return;
