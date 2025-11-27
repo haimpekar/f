@@ -145,7 +145,7 @@
             font-size: clamp(11px, 1.4vw, 18px);
             gap: 4px;
         }
-        
+
         #statusBarText {
             position: absolute;
             left: 50%;
@@ -360,7 +360,7 @@
             max-height: 20vh;
             overflow: hidden;
         }
-        
+
         @media (max-width: 640px) {
             #termHeader {
                 padding: 0 2px;
@@ -377,7 +377,7 @@
             cursor: pointer;
             font-size: 14px;
         }
-        
+
         .audio-btn.audio-only-mode {
             font-size: clamp(80px, 15vw, 180px);
             padding: 40px;
@@ -385,7 +385,7 @@
             background: #e3f2fd;
             box-shadow: 0 8px 24px rgba(25, 118, 210, 0.3);
         }
-        
+
         body[data-theme="dark"] .audio-btn.audio-only-mode {
             background: #1a3a52;
             border-color: #42a5f5;
@@ -546,7 +546,7 @@
             background: #fafafa;
             font-size: 16px;
         }
-        
+
         @media (max-width: 640px) {
             .settings-wrap {
                 max-width: 95%;
@@ -590,11 +590,12 @@
             align-self: center;
             justify-self: start;
         }
-        
+
         @media (max-width: 640px) {
             .settings-grid {
                 gap: 16px 20px;
             }
+
             .settings-grid .label {
                 font-size: 18px;
             }
@@ -615,8 +616,9 @@
             font-size: 16px;
             padding: 8px;
         }
-        
+
         @media (max-width: 640px) {
+
             .settings-grid select,
             .settings-grid input {
                 width: 180px;
@@ -695,14 +697,14 @@
             min-height: 44px;
             min-width: 44px;
         }
-        
+
         @media (max-width: 640px) {
             .statusbar #menuBtn {
                 font-size: 22px;
                 padding: 12px 16px;
             }
         }
-        
+
         .menu-dropdown {
             position: fixed;
             top: 40px;
@@ -710,13 +712,13 @@
             background: #fff;
             border: 1px solid #ccc;
             border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             padding: 12px;
             z-index: 1000;
             min-width: 180px;
             font-size: 16px;
         }
-        
+
         @media (max-width: 640px) {
             .menu-dropdown {
                 min-width: 240px;
@@ -724,11 +726,11 @@
                 padding: 16px;
             }
         }
-        
+
         .menu-dropdown[hidden] {
             display: none !important;
         }
-        
+
         .menu-item {
             display: flex;
             align-items: center;
@@ -738,34 +740,34 @@
             border-bottom: 1px solid #eee;
             text-align: left;
         }
-        
+
         .menu-item:last-child {
             border-bottom: none;
         }
-        
+
         .menu-item:hover {
             background: #f5f5f5;
         }
-        
+
         .menu-label {
             font-size: 16px;
         }
-        
+
         @media (max-width: 640px) {
             .menu-label {
                 font-size: 18px;
             }
         }
-        
+
         .menu-arrow {
             font-size: 12px;
             color: #999;
         }
-        
+
         .menu-icon {
             font-size: 14px;
         }
-        
+
         .submenu {
             position: fixed;
             top: 40px;
@@ -773,12 +775,12 @@
             background: #fff;
             border: 1px solid #ccc;
             border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             padding: 8px 0;
             z-index: 1001;
             min-width: 150px;
         }
-        
+
         .submenu-item {
             display: flex;
             align-items: center;
@@ -787,48 +789,48 @@
             cursor: pointer;
             font-size: 14px;
         }
-        
+
         .submenu-item:hover {
             background: #f5f5f5;
         }
-        
+
         .submenu-item.active {
             font-weight: 600;
         }
-        
+
         .submenu-check {
             font-size: 12px;
             color: #1976d2;
         }
-        
+
         body[data-theme="dark"] .menu-dropdown,
         body[data-theme="dark"] .submenu {
             background: #2a2a2f;
             border-color: #444;
         }
-        
+
         body[data-theme="dark"] .menu-item:hover,
         body[data-theme="dark"] .submenu-item:hover {
             background: #3a3a3f;
         }
-        
+
         .menu-item {
             display: block;
             padding: 8px 0;
             border-bottom: 1px solid #eee;
         }
-        
+
         .menu-item:last-child {
             border-bottom: none;
         }
-        
+
         .menu-item label {
             display: block;
             font-size: 12px;
             color: #666;
             margin-bottom: 4px;
         }
-        
+
         .menu-item select {
             width: 100%;
             padding: 6px 8px;
@@ -836,7 +838,7 @@
             border: 1px solid #ccc;
             background: #f7f7f7;
         }
-        
+
         .menu-item button {
             width: 100%;
             border: 1px solid #ccc;
@@ -1134,12 +1136,12 @@
             #termHeader {
                 padding: 0 8px;
             }
-            
+
             button.answer {
                 padding: 4px;
                 line-height: 1.1;
             }
-            
+
             .answer-label {
                 line-height: 1.1;
             }
@@ -1155,7 +1157,7 @@
         <button id="menuBtn" type="button" title="Menu">☰</button>
         <span id="statusBarText">Loading…</span>
     </div>
-    
+
     <div id="menuDropdown" class="menu-dropdown" hidden>
         <div class="menu-item" id="studySetMenuItem">
             <span class="menu-label">Study Set</span>
@@ -1178,15 +1180,16 @@
             <span class="menu-icon">💬</span>
         </div>
         <div class="menu-item" id="logoutMenuItem">
-            <span class="menu-label">Logout <span id="userIdDisplay" style="font-size: 0.85em; color: #666;"></span></span>
+            <span class="menu-label">Logout <span id="userIdDisplay"
+                    style="font-size: 0.85em; color: #666;"></span></span>
             <span class="menu-icon">🚪</span>
         </div>
     </div>
-    
+
     <div id="studySetSubmenu" class="submenu" hidden>
         <div id="studySetList"></div>
     </div>
-    
+
     <div id="suspendSubmenu" class="submenu" hidden>
         <div id="suspendBandList"></div>
     </div>
@@ -1202,9 +1205,11 @@
                 </div>
                 <div class="settings-grid">
                     <div class="label">Email:</div>
-                    <div class="control"><input id="loginEmail" type="email" placeholder="your@email.com" style="width: 200px;"></div>
+                    <div class="control"><input id="loginEmail" type="email" placeholder="your@email.com"
+                            style="width: 200px;"></div>
                     <div class="label">Password:</div>
-                    <div class="control"><input id="loginPassword" type="text" placeholder="password" style="width: 200px;"></div>
+                    <div class="control"><input id="loginPassword" type="text" placeholder="password"
+                            style="width: 200px;"></div>
                 </div>
                 <div class="settings-footer">
                     <button id="loginBtn" class="btn primary" type="button">Sign In</button>
@@ -1239,7 +1244,9 @@
                     <h3>Send Feedback</h3>
                 </div>
                 <div style="margin: 10px 0;">
-                    <textarea id="feedbackText" placeholder="Share your feedback, report issues, or request access to study sets..." style="width: 100%; min-height: 150px; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit; font-size: 14px; resize: vertical;"></textarea>
+                    <textarea id="feedbackText"
+                        placeholder="Share your feedback, report issues, or request access to study sets..."
+                        style="width: 100%; min-height: 150px; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit; font-size: 14px; resize: vertical;"></textarea>
                     <div style="text-align: right; font-size: 12px; color: #666; margin-top: 4px;">
                         <span id="feedbackCharCount">0</span> / 1000
                     </div>
@@ -1260,8 +1267,10 @@
                     <h3 id="suspendModalTitle">Suspend Cards</h3>
                 </div>
                 <div style="margin: 10px 0;">
-                    <input id="suspendSearch" type="text" placeholder="Search cards..." style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; margin-bottom: 10px;">
-                    <div id="suspendCardList" style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; padding: 8px;">
+                    <input id="suspendSearch" type="text" placeholder="Search cards..."
+                        style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; margin-bottom: 10px;">
+                    <div id="suspendCardList"
+                        style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; padding: 8px;">
                         <!-- Cards will be populated here -->
                     </div>
                 </div>
@@ -1293,7 +1302,8 @@
         <div id="termHeader">
             <h1 id="termText" class="autoshrink" dir="auto"></h1>
             <button id="audioBtn" class="audio-btn" hidden aria-label="Play term audio" title="Play audio">🔊</button>
-            <button id="suspendBtn" class="audio-btn" hidden aria-label="Suspend this card" title="Suspend card">🚫</button>
+            <button id="suspendBtn" class="audio-btn" hidden aria-label="Suspend this card"
+                title="Suspend card">🚫</button>
         </div>
         <div id="termImageWrap" class="term-image">
             <img id="termImage" alt="Term related visual" />
@@ -1317,7 +1327,7 @@
     <script>
         // Audio element and initialization (outside DOMContentLoaded)
         let _audioEl = null;
-        
+
         function initAudioElement() {
             if (!_audioEl) {
                 _audioEl = document.createElement('audio');
@@ -1344,7 +1354,7 @@
             console.log('Audio Ready State:', audio.readyState);
             return { audio, _audioEnabled, _currentAudioUrl };
         };
-        
+
         window.testAudio = (url) => {
             const audio = _audioEl || initAudioElement();
             const testUrl = url || 'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=he&q=test';
@@ -1373,29 +1383,29 @@
             if (fb) fb.innerHTML = `<span class="error">${sb ? sb.textContent : msg}</span>`;
             log_(msg);
         }
-        
+
         function showConfirm(message, onConfirm) {
             const modal = $('confirmModal');
             const messageEl = $('confirmMessage');
             const okBtn = $('confirmOkBtn');
             const cancelBtn = $('confirmCancelBtn');
-            
+
             if (!modal || !messageEl || !okBtn || !cancelBtn) return;
-            
+
             messageEl.textContent = message;
             modal.hidden = false;
-            
+
             const cleanup = () => {
                 modal.hidden = true;
                 okBtn.onclick = null;
                 cancelBtn.onclick = null;
             };
-            
+
             okBtn.onclick = () => {
                 cleanup();
                 if (onConfirm) onConfirm();
             };
-            
+
             cancelBtn.onclick = cleanup;
         }
 
@@ -1436,7 +1446,7 @@
 
         const MOCK_SET_SETTINGS = {
             AudioEnabled: true,
-            AudioOnly: false,            
+            AudioOnly: false,
             DistractorsAsReference: false,
             Ladder: '{1/1440;1/1440;3/1440;3/1440;10/1440;10/1440;30/1440;30/1440;12/24;2;4;7;14;30;60;90;105;115;120}',
             Lang: 'he'
@@ -1469,17 +1479,17 @@
             entries.forEach(line => console.log('[BACK]', line));
             console.groupEnd();
         }
-        
+
         // Force performance logs to always show (bypass DEBUG_MODE)
         console.log('[INIT] Performance logging enabled - you should see timing logs in console');
-        
+
         // Cloudflare Worker URL (proxies to Apps Script)
         const API_URL = 'https://fsrs.haim-pekar.workers.dev/';
         // Auto-detect local file:// protocol and force mock mode
         const IS_LOCAL = window.location.protocol === 'file:';
         const HAS_SERVER = !!API_URL && !IS_LOCAL;
         const IS_MOCK = !HAS_SERVER; // single source of truth for mode
-        
+
         function shuffleArray(array) {
             const shuffled = [...array];
             for (let i = shuffled.length - 1; i > 0; i--) {
@@ -1520,7 +1530,7 @@
             const emailInput = $('loginEmail');
             const passwordInput = $('loginPassword');
             const errorDiv = $('loginError');
-            
+
             if (modal) modal.hidden = false;
             if (emailInput) {
                 emailInput.focus();
@@ -1556,17 +1566,17 @@
                 showLoginError('Please fill in all fields');
                 return null;
             }
-            
+
             if (!validateEmail(email)) {
                 showLoginError('Please enter a valid email address');
                 return null;
             }
-            
+
             if (email.startsWith("'") || password.startsWith("'")) {
                 showLoginError('Email and password cannot start with an apostrophe');
                 return null;
             }
-            
+
             // Show processing message
             const errorDiv = $('loginError');
             if (errorDiv) {
@@ -1574,7 +1584,7 @@
                 errorDiv.style.display = 'block';
                 errorDiv.style.color = '#666';
             }
-            
+
             try {
                 const result = await service.getSession({ userId: email, password: password });
                 if (result.success !== false) {
@@ -1587,8 +1597,8 @@
                     if (result.error === 'NEW_USER_REGISTERED') {
                         const sets = result.availableSets || [];
                         const adminEmail = result.adminEmail || 'administrator';
-                        errorMsg = `Account created! To start learning, contact administrator (${adminEmail}) to enable access to:\n\n` + 
-                                   sets.map(s => '• ' + s).join('\n');
+                        errorMsg = `Account created! To start learning, contact administrator (${adminEmail}) to enable access to:\n\n` +
+                            sets.map(s => '• ' + s).join('\n');
                     } else if (result.error === 'USER_NOT_FOUND') {
                         errorMsg = 'User not found. Please contact administrator';
                     } else if (result.error === 'WRONG_PASSWORD') {
@@ -1608,34 +1618,64 @@
         const MIN_REVIEW_INTERVAL_MS = 6 * 60 * 60 * 1000; // allow reviewing items due within 6 hours
         let _lastSavedAnswerCount = 0;
         const DISTRACTOR_KEYS = ['distractor1', 'distractor2', 'distractor3'];
-        
+
         // Async save queue
         const SaveQueue = {
             queue: [],
             processing: false,
-            
+
             add(saveType, data) {
+                // Capture credentials NOW to avoid null reference when process() runs later
+                const credentials = {
+                    userId: currentCredentials?.email,
+                    password: currentCredentials?.password,
+                    activeSet: payload?.activeSet
+                };
+
+                // Validate we have credentials before queueing
+                if (!credentials.userId || !credentials.password) {
+                    log_('[SaveQueue] Cannot queue save - no credentials');
+                    showToast('Not logged in - changes not saved', 'error');
+                    return;
+                }
+
                 // Deduplicate: remove older saves of same type
                 if (saveType === 'progress' || saveType === 'settings') {
                     this.queue = this.queue.filter(item => item.saveType !== saveType);
                 }
-                const item = { saveType, data, attempts: 0, timestamp: Date.now() };
+                const item = { saveType, data, credentials, attempts: 0, timestamp: Date.now() };
                 this.queue.push(item);
                 localStorage.setItem('saveQueue', JSON.stringify(this.queue));
                 this.process();
             },
-            
+
             async process() {
                 if (this.processing || this.queue.length === 0) return;
                 this.processing = true;
-                
+
                 while (this.queue.length > 0) {
                     const item = this.queue[0];
+
+                    // Use stored credentials from when save was queued
+                    const creds = item.credentials || {
+                        userId: currentCredentials?.email,
+                        password: currentCredentials?.password,
+                        activeSet: payload?.activeSet
+                    };
+
+                    // Skip if no valid credentials
+                    if (!creds.userId || !creds.password) {
+                        log_('[SaveQueue] Skipping save - no credentials for:', item.saveType);
+                        this.queue.shift();
+                        localStorage.setItem('saveQueue', JSON.stringify(this.queue));
+                        continue;
+                    }
+
                     try {
                         await service.saveSession({
-                            userId: currentCredentials.email,
-                            password: currentCredentials.password,
-                            activeSet: payload?.activeSet,
+                            userId: creds.userId,
+                            password: creds.password,
+                            activeSet: creds.activeSet,
                             ...item.data
                         });
                         this.queue.shift();
@@ -1644,20 +1684,20 @@
                     } catch (err) {
                         item.attempts++;
                         if (item.attempts >= 3) {
-                            log_('[SaveQueue] Failed after 3 attempts:', item.saveType);
+                            log_('[SaveQueue] Failed after 3 attempts:', item.saveType, err);
                             showToast(`Failed to save ${item.saveType}`, 'error');
                             this.queue.shift();
                         } else {
-                            log_(`[SaveQueue] Retry ${item.attempts}/3 for ${item.saveType}`);
+                            log_(`[SaveQueue] Retry ${item.attempts}/3 for ${item.saveType}:`, err.message);
                             await new Promise(r => setTimeout(r, 1000 * item.attempts));
                         }
                         localStorage.setItem('saveQueue', JSON.stringify(this.queue));
                     }
                 }
-                
+
                 this.processing = false;
             },
-            
+
             restore() {
                 try {
                     const stored = localStorage.getItem('saveQueue');
@@ -1673,11 +1713,11 @@
                 }
             }
         };
-        
+
         function buildLexiconSchema(studySetSchema, userProgressSchema) {
             log_('[buildLexiconSchema] Building merged schema');
             const offset = Object.keys(studySetSchema).length;
-            const merged = {...studySetSchema};
+            const merged = { ...studySetSchema };
             for (const key in userProgressSchema) {
                 merged[key] = userProgressSchema[key] + offset;
             }
@@ -1717,21 +1757,21 @@
                 const t0 = performance.now();
                 console.log(`[PERF→FRONT] getSession START`);
                 const t1 = performance.now();
-                const payload = JSON.stringify({action: 'getSession', ...arg});
-                console.log(`[PERF→FRONT] JSON.stringify ${Math.round(performance.now()-t1)}ms`);
+                const payload = JSON.stringify({ action: 'getSession', ...arg });
+                console.log(`[PERF→FRONT] JSON.stringify ${Math.round(performance.now() - t1)}ms`);
                 const t2 = performance.now();
                 const response = await fetch(API_URL, {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: { 'Content-Type': 'application/json' },
                     body: payload
                 });
-                console.log(`[PERF→FRONT] fetch() ${Math.round(performance.now()-t2)}ms`);
+                console.log(`[PERF→FRONT] fetch() ${Math.round(performance.now() - t2)}ms`);
                 const t3 = performance.now();
                 const result = await response.json();
-                console.log(`[PERF→FRONT] response.json() ${Math.round(performance.now()-t3)}ms`);
+                console.log(`[PERF→FRONT] response.json() ${Math.round(performance.now() - t3)}ms`);
                 const size = JSON.stringify(result).length;
-                console.log(`[PERF→FRONT] getSession TOTAL ${Math.round(performance.now()-t0)}ms`);
-                console.log(`[FRONT←BACK] getSession ${(size/1024).toFixed(1)}KB ${Math.round(performance.now()-t0)}ms`);
+                console.log(`[PERF→FRONT] getSession TOTAL ${Math.round(performance.now() - t0)}ms`);
+                console.log(`[FRONT←BACK] getSession ${(size / 1024).toFixed(1)}KB ${Math.round(performance.now() - t0)}ms`);
                 if (result && Array.isArray(result.debugLog) && result.debugLog.length) {
                     logBackendDebug(result.debugLog, 'getSession');
                 }
@@ -1745,12 +1785,12 @@
                 const size = JSON.stringify(payload).length;
                 const response = await fetch(API_URL, {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({action: 'saveSession', ...payload})
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'saveSession', ...payload })
                 });
                 const result = await response.json();
                 const answered = payload?.data ? `answered=${_lastSavedAnswerCount}` : '';
-                log_(`[FRONT→BACK] saveSession(${payload.saveType}) ${answered} ${(size/1024).toFixed(1)}KB ${Math.round(performance.now()-t0)}ms`);
+                log_(`[FRONT→BACK] saveSession(${payload.saveType}) ${answered} ${(size / 1024).toFixed(1)}KB ${Math.round(performance.now() - t0)}ms`);
                 if (result && Array.isArray(result.debugLog) && result.debugLog.length) {
                     logBackendDebug(result.debugLog, 'saveSession');
                 }
@@ -1764,16 +1804,16 @@
                 if (arg && arg.userId && arg.password) {
                     const email = String(arg.userId).toLowerCase();
                     const password = String(arg.password);
-                    
+
                     if (!MOCK_CREDENTIALS[email]) {
                         return { success: false, error: 'USER_NOT_FOUND' };
                     }
-                    
+
                     if (MOCK_CREDENTIALS[email] !== password) {
                         return { success: false, error: 'WRONG_PASSWORD' };
                     }
                 }
-                
+
                 const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
                 const cards = MOCK_ITEMS;
                 const userProgress = MOCK_PROGRESS;
@@ -1803,11 +1843,11 @@
         async function maybeAutosave_() {
             const answered = payload?.state?.answeredCount || 0;
             if (answered - _lastSavedAnswerCount < AUTOSAVE_EVERY) return;
-            
+
             _lastSavedAnswerCount = answered;
             const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
             const userProgress = payload.items.map(row => row.slice(cardWidth));
-            
+
             SaveQueue.add('progress', {
                 saveType: 'progress',
                 data: userProgress
@@ -1901,21 +1941,21 @@
 
         async function playAudioUrl(url) {
             if (!url) return false;
-            
+
             const audio = _audioEl || initAudioElement();
             const requestId = ++_audioRequestId;
-            
-            try { 
+
+            try {
                 audio.pause();
                 audio.currentTime = 0;
-            } catch {}
-            
+            } catch { }
+
             try {
                 if (requestId !== _audioRequestId) return false;
-                
+
                 log_('[Audio] Playing URL:', url);
                 audio.src = url;
-                
+
                 let rate = 1;
                 try {
                     const currentIndex = payload?.state?.currentIndex;
@@ -1930,15 +1970,15 @@
                 } catch (e) {
                     rate = 1;
                 }
-                
+
                 audio.playbackRate = rate;
-                
+
                 if (requestId !== _audioRequestId) return false;
-                
+
                 await audio.play();
                 log_('[Audio] Playing successfully');
                 _audioSrc = url;
-                
+
                 return true;
             } catch (e) {
                 log_('[Audio] Play failed:', e.message);
@@ -1979,13 +2019,13 @@
             audioBtn.onclick = () => {
                 // Check if we're in AudioOnly mode
                 const isAudioOnly = audioBtn.classList.contains('audio-only-mode');
-                
+
                 if (isAudioOnly) {
                     // AudioOnly mode: always replay
                     playAudioUrl(_currentAudioUrl);
                     return;
                 }
-                
+
                 // Normal mode: toggle audio on/off
                 _audioEnabled = !_audioEnabled;
 
@@ -2034,7 +2074,7 @@
             const limitNew = baseNewLimit + extraNew;
             const servedNew = Number(payload?.state?.servedNewToday || 0);
             const remainingNew = Math.max(0, limitNew - servedNew);
-            
+
             let remainingReview = 0;
             for (const row of payload.items) {
                 if (!row) continue;
@@ -2051,7 +2091,7 @@
             if (!el) return;
             const stats = computeSessionStats();
             const deckName = payload?.activeSet || '';
-            
+
             // Build HTML with explicit direction control to prevent RTL/LTR mixing issues
             if (deckName) {
                 el.innerHTML = `<span dir="auto">${deckName}</span><span dir="ltr"> - ${payload.state.answeredCount} answered · New: ${stats.remainingNew} · Review: ${stats.remainingReview}</span>`;
@@ -2319,7 +2359,7 @@
                 showError_('No study set loaded');
                 return;
             }
-            
+
             // Initialize test state - exclude suspended cards
             const C = payload.schema.lexiconCols;
             const indices = [];
@@ -2329,12 +2369,12 @@
                     indices.push(i);
                 }
             }
-            
+
             if (indices.length === 0) {
                 showError_('No cards available for testing (all suspended)');
                 return;
             }
-            
+
             testState = {
                 setName: payload.activeSet || 'Test',
                 shuffledIndices: shuffleArray(indices),
@@ -2344,27 +2384,27 @@
                 totalQuestions: indices.length,
                 sessionId: Date.now() + '_' + Math.random().toString(36).substr(2, 9)
             };
-            
+
             // Update menu item
             const label = $('testModeLabel');
             const icon = $('testModeIcon');
             if (label) label.textContent = 'Learn Mode';
             if (icon) icon.textContent = '📚';
-            
+
             // Update UI for test mode
             $('quizArea').classList.remove('hidden');
             $('doneArea').classList.add('hidden');
-            
+
             renderTestQuestion();
         }
-        
+
         function suspendCurrentTestCard() {
             if (!testState) return;
             const actualIndex = testState.shuffledIndices[testState.currentIndex];
             const C = payload.schema.lexiconCols;
             const row = payload.items[actualIndex];
             row[C.suspended] = true;
-            
+
             // Skip to next question
             testState.currentIndex++;
             renderTestQuestion();
@@ -2381,16 +2421,16 @@
                     log_('Failed to stop audio:', e);
                 }
             }
-            
+
             if (!testState || testState.currentIndex >= testState.shuffledIndices.length) {
                 showTestResults();
                 return;
             }
-            
+
             const actualIndex = testState.shuffledIndices[testState.currentIndex];
             const row = payload.items[actualIndex];
             const C = payload.schema.lexiconCols;
-            
+
             // Update progress - show number of questions answered so far
             const sb = $('statusBarText');
             const percentage = testState.currentIndex > 0 ? Math.round((testState.score / testState.currentIndex) * 100) : 0;
@@ -2402,18 +2442,18 @@
                     sb.textContent = `Questions: ${testState.currentIndex} · Score: ${percentage}%`;
                 }
             }
-            
+
             // Determine question mode based on QuizMode setting (same as Learn Mode)
             const { effectiveMode, optionsBundle } = determineQuestionMode(actualIndex);
             const isMCQ = (effectiveMode === 'MultipleChoice');
-            
+
             const term = String(row[C.term]);
             const def = String(row[C.definition]);
             const qEl = $('termText');
             const answersEl = $('answers');
             const termHeader = $('termHeader');
             const suspendBtn = $('suspendBtn');
-            
+
             // Show suspend button in test mode
             if (suspendBtn) {
                 suspendBtn.hidden = false;
@@ -2423,26 +2463,26 @@
                     });
                 };
             }
-            
+
             const isAudioOnly = payload?.setSettings?.AudioOnly === true || payload?.setSettings?.AudioOnly === 'true';
             setupAudioForRow(row, isAudioOnly);
             setupImageForRow(row, term);
-            
+
             setFeedback_('');
             answersEl.innerHTML = '';
             answersEl.classList.toggle('is-flash', !isMCQ);
-            
+
             if (isMCQ) {
                 // MCQ mode
                 termHeader?.removeAttribute('data-hide');
                 qEl.classList.add('autoshrink');
                 qEl.textContent = term;
-                
+
                 if (optionsBundle.options.length === 0) {
                     showError_('Cannot generate test question for this item');
                     return;
                 }
-                
+
                 answersEl.dataset.count = String(optionsBundle.options.length);
                 const correctIndex = optionsBundle.correctIndex;
                 for (let i = 0; i < optionsBundle.options.length; i++) {
@@ -2463,7 +2503,7 @@
                 qEl.classList.add('autoshrink');
                 qEl.textContent = term;
                 renderFlashCard(term, def);
-                
+
                 // Update flash card buttons to use onTestAnswer
                 const okBtn = document.querySelector('.fc-btn.correct');
                 const noBtn = document.querySelector('.fc-btn.wrong');
@@ -2473,14 +2513,14 @@
                     noBtn.onclick = () => onTestAnswer(-1, FLASH_CORRECT);
                 }
             }
-            
+
             setTimeout(autoshrinkAll, 0);
         }
-        
+
         function onTestAnswer(chosenIndex, correctIndex) {
             const isCorrect = chosenIndex === correctIndex;
             if (isCorrect) testState.score++;
-            
+
             // Update status bar immediately after answer
             testState.currentIndex++;
             const sb = $('statusBarText');
@@ -2493,14 +2533,14 @@
                     sb.textContent = `Questions: ${testState.currentIndex} · Score: ${percentage}%`;
                 }
             }
-            
+
             // Show feedback
             const btns = Array.from(document.querySelectorAll('.answer'));
             btns.forEach(b => {
                 b.disabled = true;
                 b.classList.remove('correct', 'wrong', 'selected-wrong');
             });
-            
+
             if (isCorrect) {
                 setFeedback_('<span class="success">✓ Correct</span>');
                 if (btns[correctIndex]) btns[correctIndex].classList.add('correct');
@@ -2509,12 +2549,12 @@
                 if (chosenIndex >= 0 && btns[chosenIndex]) btns[chosenIndex].classList.add('wrong', 'selected-wrong');
                 if (btns[correctIndex]) btns[correctIndex].classList.add('correct');
             }
-            
+
             // Auto-save every 10 questions (background)
             if (testState.currentIndex % 10 === 0) {
                 saveTestProgress().catch(e => log_('Background test save failed:', e));
             }
-            
+
             // Continue with same pattern as learn mode
             let continueTimer = null;
             const done = () => {
@@ -2534,14 +2574,14 @@
                 continueTimer = setTimeout(done, 400);
             }
         }
-        
+
         async function saveTestProgress() {
             const d = testState.startTime;
             const testDateTime = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
             const questionsAnswered = testState.currentIndex;
             const percentage = Math.round((testState.score / questionsAnswered) * 100);
             const testSessionId = testState.sessionId;
-            
+
             SaveQueue.add('testResult', {
                 saveType: 'testResult',
                 testData: {
@@ -2553,78 +2593,78 @@
                 }
             });
         }
-        
+
         async function exitTestMode() {
             if (testState && testState.currentIndex > 0) {
                 await saveTestProgress().catch(e => log_('Test save failed:', e));
                 const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
                 const userProgress = payload.items.map(row => row.slice(cardWidth));
-                await service.saveSession({ 
-                    userId: currentCredentials.email, 
+                await service.saveSession({
+                    userId: currentCredentials.email,
                     password: currentCredentials.password,
                     activeSet: payload.activeSet,
-                    saveType: 'progress', 
-                    data: userProgress 
+                    saveType: 'progress',
+                    data: userProgress
                 }).catch(e => log_('Progress save failed:', e));
             }
             testState = null;
-            
+
             // Update menu item
             const label = $('testModeLabel');
             const icon = $('testModeIcon');
             if (label) label.textContent = 'Test Mode';
             if (icon) icon.textContent = '🧪';
-            
+
             // Reset UI state
             $('quizArea').classList.remove('hidden');
             $('doneArea').classList.add('hidden');
-            
+
             // Reset payload state
             if (payload && payload.state) {
                 payload.state.currentIndex = -1;
             }
-            
+
             goNext();
         }
-        
+
         function showTestResults() {
             const percentage = Math.round((testState.score / testState.totalQuestions) * 100);
-            
+
             $('quizArea').classList.add('hidden');
             $('doneArea').classList.remove('hidden');
-            
+
             $('scoreText').textContent = `${testState.score}/${testState.totalQuestions} (${percentage}%)`;
             const el = $('statusBarText');
             if (el) el.textContent = 'Test Complete';
-            
+
             // Hide the "study more" prompt in test mode
             const extraPrompt = $('extraNewPrompt');
             if (extraPrompt) extraPrompt.style.display = 'none';
-            
+
             // Save in background
             saveTestProgress().catch(e => log_('Background test save failed:', e));
             const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
             const userProgress = payload.items.map(row => row.slice(cardWidth));
-            service.saveSession({ 
-                userId: currentCredentials.email, 
+            service.saveSession({
+                userId: currentCredentials.email,
                 password: currentCredentials.password,
-                saveType: 'progress', 
-                data: userProgress 
+                saveType: 'progress',
+                data: userProgress
             }).catch(e => log_('Background progress save failed:', e));
-            
+
             testState = null;
         }
-        
+
         async function loadSession() {
             log_('[loadSession] START email=' + currentCredentials.email);
-            const sessionArg = { 
-                userId: currentCredentials.email, 
+            const sessionArg = {
+                userId: currentCredentials.email,
                 password: currentCredentials.password,
                 setName: currentCredentials.setName || null
             };
             const sess = await service.getSession(sessionArg);
             log_('[loadSession] Received session success=' + sess.success);
-            
+
             if (sess.success === false) {
                 if (sess.error === 'WRONG_PASSWORD' || sess.error === 'USER_NOT_FOUND') {
                     clearCredentials();
@@ -2634,7 +2674,7 @@
                 // Handle other errors (sheet parsing, missing metadata, etc.)
                 throw new Error(sess.error || 'Failed to load session');
             }
-            
+
             return sess;
         }
 
@@ -2648,9 +2688,9 @@
         function populateStudySetMenu(sess) {
             const studySetList = $('studySetList');
             if (!studySetList || !Array.isArray(sess.availableSets)) return;
-            
+
             studySetList.innerHTML = '';
-            
+
             if (sess.availableSets.length === 0) {
                 const msg = document.createElement('div');
                 msg.style.padding = '12px';
@@ -2660,55 +2700,55 @@
                 studySetList.appendChild(msg);
                 return;
             }
-            
+
             sess.availableSets.forEach(setName => {
                 const item = document.createElement('div');
                 item.className = 'submenu-item';
                 if (setName === sess.activeSet) item.classList.add('active');
-                
+
                 const label = document.createElement('span');
                 label.textContent = setName;
                 item.appendChild(label);
-                
+
                 if (setName === sess.activeSet) {
                     const check = document.createElement('span');
                     check.className = 'submenu-check';
                     check.textContent = '✓';
                     item.appendChild(check);
                 }
-                
+
                 item.onclick = async () => {
                     if (setName === sess.activeSet) return;
                     if (menuDropdown) menuDropdown.hidden = true;
                     if (studySetSubmenu) studySetSubmenu.hidden = true;
-                    
+
                     const sb = $('statusBarText');
                     if (sb) sb.textContent = 'Switching set...';
-                    
+
                     // Save progress if needed
                     const saves = [];
                     if (testState && testState.currentIndex > 0) saves.push(saveTestProgress());
                     if (payload && payload.state && payload.state.answeredCount > 0) {
                         const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
                         const userProgress = payload.items.map(row => row.slice(cardWidth));
-                        saves.push(service.saveSession({ 
-                            userId: currentCredentials.email, 
+                        saves.push(service.saveSession({
+                            userId: currentCredentials.email,
                             password: currentCredentials.password,
                             activeSet: payload.activeSet,
-                            saveType: 'progress', 
-                            data: userProgress 
+                            saveType: 'progress',
+                            data: userProgress
                         }));
                     }
                     if (saves.length) await Promise.allSettled(saves);
-                    
+
                     // Reset state before loading new set
                     testState = null;
                     payload = null;
                     settings = [];
                     _lastSavedAnswerCount = 0;
-                    
+
                     // DON'T clear cache - keep all decks cached for instant switching
-                    
+
                     // Load new set
                     try {
                         saveCredentials(currentCredentials.email, currentCredentials.password, setName);
@@ -2717,14 +2757,14 @@
                         showError_('Failed to switch set: ' + err);
                     }
                 };
-                
+
                 studySetList.appendChild(item);
             });
         }
-        
+
         function handleNoActiveSet(sess) {
             const sb = $('statusBarText');
-            
+
             if (!sess.availableSets || sess.availableSets.length === 0) {
                 if (sb) {
                     const adminEmail = sess.adminEmail || 'administrator';
@@ -2735,10 +2775,10 @@
                     sb.textContent = 'Choose a study set from the menu (☰) to begin';
                 }
             }
-            
+
             $('quizArea').classList.add('hidden');
             $('doneArea').classList.add('hidden');
-            
+
             const hasAvailableSets = sess.availableSets && sess.availableSets.length > 0;
             const studySetItem = $('studySetMenuItem');
             if (studySetItem) {
@@ -2750,7 +2790,7 @@
                     studySetItem.style.pointerEvents = 'none';
                 }
             }
-            
+
             ['testModeMenuItem', 'suspendMenuItem', 'settingsMenuItem'].forEach(id => {
                 const el = $(id);
                 if (el) {
@@ -2759,11 +2799,11 @@
                 }
             });
         }
-        
+
         function enableMenuItems(sess) {
             const hasAvailableSets = sess.availableSets && sess.availableSets.length > 0;
             const hasActiveSet = !!sess.activeSet;
-            
+
             const studySetItem = $('studySetMenuItem');
             if (studySetItem) {
                 if (hasAvailableSets) {
@@ -2774,7 +2814,7 @@
                     studySetItem.style.pointerEvents = 'none';
                 }
             }
-            
+
             ['testModeMenuItem', 'suspendMenuItem', 'settingsMenuItem'].forEach(id => {
                 const el = $(id);
                 if (el) {
@@ -2798,7 +2838,7 @@
                 return [...cardRow, ...progressRow];
             });
             log_('[buildPayload] Built ' + items.length + ' items');
-            
+
             const schema = !IS_MOCK
                 ? (sess.studySetSchema && sess.userProgressSchema
                     ? { lexiconCols: buildLexiconSchema(sess.studySetSchema, sess.userProgressSchema) }
@@ -2830,7 +2870,7 @@
             dbName: 'fsrs_decks',
             storeName: 'sessions',
             db: null,
-            
+
             async init() {
                 if (this.db) return this.db;
                 return new Promise((resolve, reject) => {
@@ -2848,7 +2888,7 @@
                     };
                 });
             },
-            
+
             async get(key) {
                 try {
                     await this.init();
@@ -2864,7 +2904,7 @@
                     return null;
                 }
             },
-            
+
             async set(key, value) {
                 try {
                     await this.init();
@@ -2884,21 +2924,21 @@
         async function boot(cachedSession = null) {
             const t0 = performance.now();
             log_('[boot] START');
-            
+
             if (!currentCredentials || !currentCredentials.email || !currentCredentials.password) {
                 log_('[boot] No credentials, showing login');
                 showLoginModal();
                 return;
             }
             log_('[boot] Has credentials, loading session');
-            
+
             const sb = $('statusBarText');
             if (sb) sb.textContent = 'Loading...';
-            
+
             // Try IndexedDB cache first
             const cacheKey = `${currentCredentials.email}_${currentCredentials.setName || 'default'}`;
             let cachedSess = null;
-            
+
             if (!cachedSession) {
                 try {
                     cachedSess = await DeckCache.get(cacheKey);
@@ -2910,43 +2950,43 @@
                     log_('[boot] Cache read failed:', e);
                 }
             }
-            
+
             try {
                 // If we have cached data, show it immediately
                 if (cachedSess) {
                     const sess = cachedSess;
                     setupUserDisplay(sess);
                     populateStudySetMenu(sess);
-                    
+
                     if (!sess.activeSet) {
                         handleNoActiveSet(sess);
                         return;
                     }
-                    
+
                     enableMenuItems(sess);
-                    
+
                     if (!Array.isArray(sess.cards) || !Array.isArray(sess.userProgress)) {
                         throw new Error('Cached session is invalid');
                     }
-                    
+
                     payload = buildPayload(sess);
                     settings = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
                     renderSettingsUI({ settings });
                     applyTheme();
                     autoAdjustNewItemsPerDay();
-                    
+
                     $('quizArea').classList.remove('hidden');
                     $('doneArea').classList.add('hidden');
                     initAudioStateFromSettings();
-                    
+
                     log_('[boot] Cached data displayed, fetching fresh in background');
                     if (sb) sb.textContent = 'Syncing...';
                     goNext();
                 }
-                
+
                 // Always fetch fresh data in background
                 const sess = cachedSession || (log_('boot: calling service.getSession()'), await loadSession());
-                
+
                 // Display retry info if present
                 if (sess.retryInfo) {
                     log_('[boot] ' + sess.retryInfo);
@@ -2955,25 +2995,25 @@
                     log_(`[boot] Frontend retried ${frontendRetryCount} request(s)`);
                     frontendRetryCount = 0;
                 }
-                
+
                 // Update cache with fresh data (IndexedDB)
                 DeckCache.set(cacheKey, sess).catch(e => log_('[boot] Cache write failed:', e));
                 log_('[boot] Cache updated with fresh data');
-                
+
                 // If we already showed cached data, check if anything changed
                 if (cachedSess) {
                     const progressChanged = JSON.stringify(cachedSess.userProgress) !== JSON.stringify(sess.userProgress);
                     if (progressChanged) {
                         log_('[boot] Progress changed, updating UI');
                         if (sb) sb.textContent = 'Updated from server';
-                        
+
                         // Rebuild payload with fresh data
                         payload = buildPayload(sess);
                         settings = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
                         renderSettingsUI({ settings });
                         applyTheme();
                         autoAdjustNewItemsPerDay();
-                        
+
                         // Reset to first card with fresh data
                         payload.state.currentIndex = -1;
                         goNext();
@@ -2983,23 +3023,23 @@
                     }
                     return;
                 }
-                
+
                 // No cached data - show fresh data normally
                 setupUserDisplay(sess);
                 populateStudySetMenu(sess);
-                
+
                 if (!sess.activeSet) {
                     handleNoActiveSet(sess);
                     return;
                 }
-                
+
                 enableMenuItems(sess);
-                
+
                 if (!Array.isArray(sess.cards) || !Array.isArray(sess.userProgress)) {
                     log_('Session validation failed:', sess);
                     throw new Error('Session is missing cards/userProgress');
                 }
-                
+
                 payload = buildPayload(sess);
                 log_('[boot] Payload built, items=' + payload.items.length);
                 log_('[boot] Payload.settings:', JSON.stringify(payload.settings));
@@ -3019,7 +3059,7 @@
 
                 // Autoplay arming (once)
                 initAudioStateFromSettings();
-                log_('[boot] SUCCESS ' + Math.round(performance.now()-t0) + 'ms');
+                log_('[boot] SUCCESS ' + Math.round(performance.now() - t0) + 'ms');
                 if (!cachedSess) goNext();
             } catch (err) {
                 log_('boot: caught error', err);
@@ -3051,7 +3091,7 @@
                 $('quizArea').classList.remove('hidden');
                 $('doneArea').classList.add('hidden');
                 initAudioStateFromSettings();
-                log_(`[FRONT] boot(mock) ${Math.round(performance.now()-t0)}ms`);
+                log_(`[FRONT] boot(mock) ${Math.round(performance.now() - t0)}ms`);
                 goNext();
             }
         }
@@ -3115,7 +3155,7 @@
             const row = payload.items[rowIndex] || [];
             const correctText = String(row[defCol] ?? '').trim();
             if (!correctText) return { options: [], correctIndex: null };
-            
+
             const useReferences = (() => {
                 try {
                     const setSettings = payload?.setSettings || MOCK_SET_SETTINGS || {};
@@ -3157,7 +3197,7 @@
                     correctIndex
                 };
             }
-            
+
             // Non-reference mode: read literal text from distractor columns
             const texts = [];
             for (const idx of distractorIndices) {
@@ -3180,38 +3220,38 @@
             const C = payload.schema.lexiconCols;
             const currentIndex = payload.state.currentIndex;
             if (currentIndex < 0 || currentIndex >= payload.items.length) return;
-            
+
             const row = payload.items[currentIndex];
             row[C.suspended] = true;
-            
+
             // In study mode, autosave will handle persistence
             // Skip to next card immediately
             goNext();
         }
-        
+
         function populateSuspendBands() {
             if (!payload || !payload.items) return;
-            
+
             const C = payload.schema.lexiconCols;
             const bandList = $('suspendBandList');
             if (!bandList) return;
-            
+
             // Collect unique bands
             const bandCounts = {};
             for (const row of payload.items) {
                 const band = String(row[C.band] || '').trim() || 'No Band';
                 bandCounts[band] = (bandCounts[band] || 0) + 1;
             }
-            
+
             const bands = Object.keys(bandCounts).sort();
             bandList.innerHTML = '';
-            
+
             // If only one band or no bands, open directly
             if (bands.length <= 1) {
                 openSuspendModal(null);
                 return;
             }
-            
+
             // Create submenu items for each band
             bands.forEach(band => {
                 const item = document.createElement('div');
@@ -3224,7 +3264,7 @@
                 };
                 bandList.appendChild(item);
             });
-            
+
             // Add "All Cards" option
             const allItem = document.createElement('div');
             allItem.className = 'submenu-item';
@@ -3236,22 +3276,22 @@
             };
             bandList.appendChild(allItem);
         }
-        
+
         function openSuspendModal(bandFilter) {
             if (!payload || !payload.items) return;
-            
+
             const C = payload.schema.lexiconCols;
             const modal = $('suspendModal');
             const title = $('suspendModalTitle');
             const cardList = $('suspendCardList');
             const searchInput = $('suspendSearch');
-            
+
             if (!modal || !cardList) return;
-            
+
             if (title) {
                 title.textContent = bandFilter ? `Suspend Cards - ${bandFilter}` : 'Suspend Cards - All';
             }
-            
+
             const filteredCards = [];
             for (let i = 0; i < payload.items.length; i++) {
                 const row = payload.items[i];
@@ -3260,26 +3300,26 @@
                     filteredCards.push({ index: i, row });
                 }
             }
-            
+
             const renderCardList = (searchTerm = '') => {
                 cardList.innerHTML = '';
                 const term = searchTerm.toLowerCase();
-                
+
                 const highlight = (text) => {
                     if (!term) return text;
                     const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
                     return text.replace(regex, '<mark style="background: #ffeb3b; padding: 0 2px;">$1</mark>');
                 };
-                
+
                 filteredCards.forEach(({ index, row }) => {
                     const cardTerm = String(row[C.term] || '').trim();
                     const cardDef = String(row[C.definition] || '').trim();
                     const combined = `${cardTerm} ${cardDef}`.toLowerCase();
-                    
+
                     if (term && !combined.includes(term)) return;
-                    
+
                     const isSuspended = !!row[C.suspended];
-                    
+
                     const item = document.createElement('div');
                     item.style.display = 'grid';
                     item.style.gridTemplateColumns = 'auto 1fr 1fr';
@@ -3287,13 +3327,13 @@
                     item.style.padding = '8px';
                     item.style.borderBottom = '1px solid #eee';
                     item.style.alignItems = 'center';
-                    
+
                     const checkbox = document.createElement('input');
                     checkbox.type = 'checkbox';
                     checkbox.checked = isSuspended;
                     checkbox.dataset.index = index;
                     checkbox.style.cursor = 'pointer';
-                    
+
                     const termSpan = document.createElement('span');
                     termSpan.innerHTML = highlight(cardTerm);
                     termSpan.setAttribute('dir', 'auto');
@@ -3301,7 +3341,7 @@
                         termSpan.style.textDecoration = 'line-through';
                         termSpan.style.opacity = '0.5';
                     }
-                    
+
                     const defSpan = document.createElement('span');
                     defSpan.innerHTML = highlight(cardDef);
                     defSpan.setAttribute('dir', 'auto');
@@ -3309,7 +3349,7 @@
                         defSpan.style.textDecoration = 'line-through';
                         defSpan.style.opacity = '0.5';
                     }
-                    
+
                     checkbox.onchange = () => {
                         const isChecked = checkbox.checked;
                         termSpan.style.textDecoration = isChecked ? 'line-through' : 'none';
@@ -3317,21 +3357,21 @@
                         defSpan.style.textDecoration = isChecked ? 'line-through' : 'none';
                         defSpan.style.opacity = isChecked ? '0.5' : '1';
                     }
-                    
+
                     item.appendChild(checkbox);
                     item.appendChild(termSpan);
                     item.appendChild(defSpan);
                     cardList.appendChild(item);
                 });
             };
-            
+
             renderCardList();
-            
+
             if (searchInput) {
                 searchInput.value = '';
                 searchInput.oninput = () => renderCardList(searchInput.value);
             }
-            
+
             modal.hidden = false;
         }
 
@@ -3341,7 +3381,7 @@
             try {
                 audio.pause();
                 audio.currentTime = 0;
-            } catch (e) {}
+            } catch (e) { }
         }
 
         function determineQuestionMode(currentIndex) {
@@ -3386,7 +3426,7 @@
                 }
 
                 updateAudioUIForCurrentRow(hasAudio);
-                
+
                 if (hasAudio && _audioEnabled) {
                     log_('[Audio] Auto-playing...');
                     playAudioUrl(_currentAudioUrl).then(success => {
@@ -3458,7 +3498,7 @@
             inner.appendChild(back);
             card.appendChild(inner);
             wrap.appendChild(card);
-            
+
             const controls = document.createElement('div');
             controls.className = 'flash-controls';
             controls.hidden = true;
@@ -3474,7 +3514,7 @@
             noBtn.className = 'fc-btn wrong';
             noBtn.textContent = '✗ Wrong';
             noBtn.disabled = true;
-            
+
             const FLASH_CORRECT = 0;
             okBtn.addEventListener('click', () => onAnswer(FLASH_CORRECT, FLASH_CORRECT));
             noBtn.addEventListener('click', () => onAnswer(-1, FLASH_CORRECT));
@@ -3503,7 +3543,7 @@
 
         function renderTerm() {
             stopAudio();
-            
+
             const C = payload.schema.lexiconCols;
             const currentIndex = payload.state.currentIndex;
             const row = payload.items[currentIndex];
@@ -3519,7 +3559,7 @@
             const qEl = $('termText');
             const suspendBtn = $('suspendBtn');
             const answersEl = $('answers');
-            
+
             if (suspendBtn) {
                 suspendBtn.hidden = false;
                 suspendBtn.onclick = () => {
@@ -3559,7 +3599,7 @@
         }
 
         let wasNewBeforeAnswer = false;
-        
+
         function updateCardSchedule(row, isCorrect) {
             const C = payload.schema.lexiconCols;
             const setSettings = payload?.setSettings || MOCK_SET_SETTINGS || {};
@@ -3567,7 +3607,7 @@
             const now = Date.now();
             const denom = ladder[Math.min(row[C.step], ladder.length - 1)] || 1;
             const due = parseDue_(row[C.due]);
-            
+
             if (isCorrect) {
                 row[C.step] = Math.min(row[C.step] + 1, ladder.length - 1);
             } else {
@@ -3575,7 +3615,7 @@
                 row[C.lapses]++;
             }
             row[C.reps]++;
-            
+
             const Inext = ladder[row[C.step]];
             const delay = (due > 0) ? (now - due) / 86400000 : 0;
             const scale = Math.min(2, Math.max(0.5, 1 + 0.3 * (delay / denom)));
@@ -3588,10 +3628,10 @@
             const C = payload.schema.lexiconCols;
             const isCorrect = chosenIndex === correctIndex;
             const row = payload.items[payload.state.currentIndex];
-            
+
             wasNewBeforeAnswer = row[C.reps] === 0 && row[C.step] === 0;
             if (wasNewBeforeAnswer) payload.state.servedNewToday++;
-            
+
             updateCardSchedule(row, isCorrect);
             payload.state.answeredCount++;
             log_('[onAnswer] answeredCount=' + payload.state.answeredCount);
@@ -3664,8 +3704,8 @@
             try {
                 audio.pause();
                 audio.currentTime = 0;
-            } catch (e) {}
-            
+            } catch (e) { }
+
             payload.state.currentIndex = decideNextIndex();
             if (payload.state.currentIndex < 0) {
                 showDone(payload.state.answeredCount, payload.items.length);
@@ -3713,12 +3753,12 @@
             setProgress();
             applyTheme();
             initAudioStateFromSettings();
-            
+
             // Re-render current card if one is showing
             if (payload && payload.state && payload.state.currentIndex >= 0) {
                 renderTerm();
             }
-            
+
             // Async save with optimistic UI
             SaveQueue.add('settings', {
                 saveType: 'settings',
@@ -3737,19 +3777,19 @@
             const loginBtn = $('loginBtn');
             const loginEmail = $('loginEmail');
             const loginPassword = $('loginPassword');
-            
+
             if (loginBtn) {
                 loginBtn.addEventListener('click', async () => {
                     const email = loginEmail?.value?.trim() || '';
                     const password = loginPassword?.value?.trim() || '';
-                    
+
                     const sessionData = await attemptLogin(email, password);
                     if (sessionData) {
                         boot(sessionData);
                     }
                 });
             }
-            
+
             // Enter key support for login
             [loginEmail, loginPassword].forEach(input => {
                 if (input) {
@@ -3761,39 +3801,39 @@
                     });
                 }
             });
-            
+
             // Menu dropdown handlers
             const menuBtn = $('menuBtn');
             const menuDropdown = $('menuDropdown');
             log_('Menu elements found:', { menuBtn: !!menuBtn, menuDropdown: !!menuDropdown });
-            
+
             if (menuBtn && menuDropdown) {
                 let menuJustOpened = false;
-                
+
                 menuBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    menuDropdown.hidden = !menuDropdown.hidden;                    
-                    
+                    menuDropdown.hidden = !menuDropdown.hidden;
+
                     if (!menuDropdown.hidden) {
                         menuJustOpened = true;
                         setTimeout(() => { menuJustOpened = false; }, 100);
                     }
                 });
-                
+
                 // Close menus when clicking outside
                 document.addEventListener('click', () => {
-                    if (!menuDropdown.hidden && !menuJustOpened) {                        
+                    if (!menuDropdown.hidden && !menuJustOpened) {
                         menuDropdown.hidden = true;
                         closeAllSubmenus();
                     }
                 });
-                
+
                 // Prevent menu from closing when clicking inside it
                 menuDropdown.addEventListener('click', (e) => {
                     e.stopPropagation();
                 });
             }
-            
+
             // Close all submenus helper (define first)
             const studySetSubmenu = $('studySetSubmenu');
             const suspendSubmenu = $('suspendSubmenu');
@@ -3801,13 +3841,13 @@
                 if (studySetSubmenu) studySetSubmenu.hidden = true;
                 if (suspendSubmenu) suspendSubmenu.hidden = true;
             };
-            
+
             // Menu item handlers
             const studySetMenuItem = $('studySetMenuItem');
             const testModeMenuItem = $('testModeMenuItem');
             const suspendMenuItem = $('suspendMenuItem');
             const settingsMenuItem = $('settingsMenuItem');
-            
+
             if (studySetMenuItem && studySetSubmenu) {
                 studySetMenuItem.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -3822,7 +3862,7 @@
                     studySetSubmenu.hidden = false;
                 });
             }
-            
+
             if (suspendMenuItem && suspendSubmenu) {
                 suspendMenuItem.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -3831,20 +3871,20 @@
                     suspendSubmenu.hidden = false;
                 });
             }
-            
+
             if (testModeMenuItem) {
                 testModeMenuItem.addEventListener('click', (e) => {
                     e.stopPropagation();
                     if (menuDropdown) menuDropdown.hidden = true;
                     closeAllSubmenus();
-                    
+
                     const hasNoSets = payload && payload.availableSets && payload.availableSets.length === 0;
                     if (hasNoSets) {
                         const adminEmail = payload.adminEmail || 'administrator';
                         alert(`No study sets available. Contact admin (${adminEmail}) to enable access.`);
                         return;
                     }
-                    
+
                     if (testState) {
                         exitTestMode();
                     } else {
@@ -3852,20 +3892,20 @@
                     }
                 });
             }
-            
+
             if (settingsMenuItem) {
                 settingsMenuItem.addEventListener('click', (e) => {
                     e.stopPropagation();
                     if (menuDropdown) menuDropdown.hidden = true;
                     closeAllSubmenus();
-                    
+
                     settingsDraft = settings.map(r => Array.isArray(r) ? r.slice() : []);
                     renderSettingsUI({ settings: settingsDraft });
                     applyTheme();
                     $('settingsModal').hidden = false;
                 });
             }
-            
+
             // Feedback modal handlers
             const feedbackMenuItem = $('feedbackMenuItem');
             const feedbackModal = $('feedbackModal');
@@ -3873,7 +3913,7 @@
             const feedbackCharCount = $('feedbackCharCount');
             const feedbackSendBtn = $('feedbackSendBtn');
             const feedbackCancelBtn = $('feedbackCancelBtn');
-            
+
             if (feedbackMenuItem && feedbackModal && feedbackText) {
                 feedbackMenuItem.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -3889,7 +3929,7 @@
                     setTimeout(() => feedbackText.focus(), 100);
                 });
             }
-            
+
             if (feedbackText && feedbackCharCount) {
                 feedbackText.addEventListener('input', () => {
                     const len = feedbackText.value.length;
@@ -3900,13 +3940,13 @@
                     }
                 });
             }
-            
+
             if (feedbackCancelBtn && feedbackModal) {
                 feedbackCancelBtn.addEventListener('click', () => {
                     feedbackModal.hidden = true;
                 });
             }
-            
+
             if (feedbackSendBtn && feedbackModal && feedbackText) {
                 feedbackSendBtn.addEventListener('click', async () => {
                     const message = feedbackText.value.trim();
@@ -3914,13 +3954,13 @@
                         alert('Please enter your feedback');
                         return;
                     }
-                    
+
                     const userId = currentCredentials?.email || 'unknown';
                     const currentSet = payload?.activeSet || '';
-                    
+
                     // Show success immediately (optimistic UI)
                     feedbackModal.hidden = true;
-                    
+
                     // Async save
                     SaveQueue.add('feedback', {
                         saveType: 'feedback',
@@ -3932,32 +3972,32 @@
                     });
                 });
             }
-            
+
             // Suspend modal handlers
             const suspendModal = $('suspendModal');
             const suspendCancelBtn = $('suspendCancelBtn');
             const suspendSaveBtn = $('suspendSaveBtn');
-            
+
             if (suspendCancelBtn && suspendModal) {
                 suspendCancelBtn.addEventListener('click', () => {
                     suspendModal.hidden = true;
                 });
             }
-            
+
             if (suspendSaveBtn && suspendModal) {
                 suspendSaveBtn.addEventListener('click', () => {
                     const C = payload.schema.lexiconCols;
                     const checkboxes = suspendModal.querySelectorAll('input[type="checkbox"]');
-                    
+
                     checkboxes.forEach(cb => {
                         const index = parseInt(cb.dataset.index);
                         if (index >= 0 && index < payload.items.length) {
                             payload.items[index][C.suspended] = cb.checked;
                         }
                     });
-                    
+
                     suspendModal.hidden = true;
-                    
+
                     // Async save
                     const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
                     const userProgress = payload.items.map(row => row.slice(cardWidth));
@@ -3967,7 +4007,7 @@
                     });
                 });
             }
-            
+
             // Settings modal handlers
             const modal = $('settingsModal');
             const backdrop = $('settingsBackdrop');
@@ -3986,7 +4026,7 @@
             if (btnSave && modal) btnSave.addEventListener('click', () => onSettingsSave(modal));
             const extraBtn = $('extraNewBtn');
             if (extraBtn) extraBtn.addEventListener('click', () => queueMoreNewItems(5));
-            
+
             // Logout menu item handler
             const logoutMenuItem = $('logoutMenuItem');
             if (logoutMenuItem) {
@@ -3994,28 +4034,28 @@
                     e.stopPropagation();
                     if (menuDropdown) menuDropdown.hidden = true;
                     closeAllSubmenus();
-                    
+
                     // Clear all state
                     clearCredentials();
                     payload = null;
                     settings = [];
                     testState = null;
-                    
+
                     // Hide quiz/done areas to clear background
                     $('quizArea').classList.add('hidden');
                     $('doneArea').classList.add('hidden');
-                    
+
                     // Clear status bar
                     const sb = $('statusBarText');
                     if (sb) sb.textContent = '';
-                    
+
                     showLoginModal();
                 });
             }
-            
+
             // Restore pending saves from previous session
             SaveQueue.restore();
-            
+
             // Try to auto-login with stored credentials, otherwise show login modal
             const stored = loadCredentials();
             if (stored && stored.email && stored.password) {
@@ -4035,16 +4075,16 @@
             if (!el) return;
             const parent = el.parentElement;
             if (!parent) return;
-            
+
             let size = max;
             el.style.fontSize = size + 'px';
-            
+
             const fits = () => {
                 const heightFits = el.scrollHeight <= parent.clientHeight;
                 const widthFits = el.scrollWidth <= parent.clientWidth;
                 return heightFits && widthFits;
             };
-            
+
             let guard = 200;
             while (!fits() && size > min && guard-- > 0) {
                 size -= step;
@@ -4069,7 +4109,7 @@
                             }
                         }
                     }
-                    
+
                     // Then fit answer labels
                     const labelNodes = Array.from(document.querySelectorAll('.answer-label'));
                     let smallest = null;
@@ -4088,7 +4128,7 @@
                             el.style.fontSize = smallest + 'px';
                         });
                     }
-                    
+
                     // Fit flashcard faces
                     document.querySelectorAll('.flip-face').forEach(el => {
                         const textLen = el.textContent.trim().length;
