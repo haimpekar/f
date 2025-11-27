@@ -3003,8 +3003,9 @@
                 // If we already showed cached data, check if anything changed
                 if (cachedSess) {
                     const progressChanged = JSON.stringify(cachedSess.userProgress) !== JSON.stringify(sess.userProgress);
-                    if (progressChanged) {
-                        log_('[boot] Progress changed, updating UI');
+                    const settingsChanged = JSON.stringify(cachedSess.userSettings) !== JSON.stringify(sess.userSettings);
+                    if (progressChanged || settingsChanged) {
+                        log_('[boot] Data changed (progress=' + progressChanged + ', settings=' + settingsChanged + '), updating UI');
                         if (sb) sb.textContent = 'Updated from server';
 
                         // Rebuild payload with fresh data
