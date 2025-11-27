@@ -4416,4 +4416,4422 @@
     </script>
 </body>
 
+</html><!-- 2025-10-31 13:45 IDT — Sheet Quiz UI (standalone-friendly) -->
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>Sheet Quiz UI</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <script>
+        // Test console immediately on page load
+        console.log('=== PAGE LOADED - Console is working ===');
+        console.log('Current URL:', window.location.href);
+        console.log('Timestamp:', new Date().toISOString());
+    </script>
+
+    <style>
+        /* Reset + full height */
+        html,
+        body {
+            height: 100%;
+        }
+
+        /* 2025-11-07 18:05 IDT — Make body a flex column: header on top, main area fills the rest */
+        body {
+            margin: 0;
+            padding: 0;
+            background: #fafafa;
+            font-family: system-ui, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        body[data-theme="dark"] {
+            background: #111;
+            color: #f3f3f3;
+        }
+
+        body[data-theme="dark"] .card,
+        body[data-theme="dark"] .answers {
+            background: #1c1c1f;
+            color: #fdfdfd;
+        }
+
+        body[data-theme="dark"] .statusbar {
+            color: #f3f3f3;
+        }
+
+        body[data-theme="dark"] .answer {
+            background: #2a2a2f;
+            border-color: #3a3a3f;
+            color: #fdfdfd;
+        }
+
+        body[data-theme="dark"] .answer:hover {
+            background: #3a3a42;
+            border-color: #5a5a63;
+        }
+
+        body[data-theme="dark"] .answer.correct {
+            border-color: #3c8e3c;
+            background: #224122;
+            color: #f7fff7;
+        }
+
+        body[data-theme="dark"] .answer.incorrect {
+            border-color: #d13939;
+            background: #2f1a1a;
+            color: #ffecec;
+        }
+
+        /* header / config row: natural height, no flex */
+        #configRow,
+        .statusbar {
+            flex: 0 0 auto;
+        }
+
+        /* main quiz/done areas share the remaining height */
+        #quizArea,
+        #doneArea {
+            flex: 1 1 auto;
+        }
+
+        /* Card container */
+        .card {
+            box-sizing: border-box;
+            margin: 0;
+            width: 100%;
+            max-width: clamp(720px, 90vw, 1100px);
+            height: min(100svh, 900px);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 12px;
+            background: #fff;
+            border: none;
+        }
+
+        .row {
+            margin: 0;
+        }
+
+        .muted {
+            color: #666;
+        }
+
+        /* MAIN area */
+        /* 2025-11-07 18:05 IDT — Done screen: center message in the reserved main area */
+        #doneArea {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            padding: 16px 12px 24px;
+            text-align: center;
+        }
+
+        #doneArea h3 {
+            margin: 0 0 8px;
+            font-size: 1.6rem;
+        }
+
+        #doneArea .row {
+            margin-top: 4px;
+        }
+
+        /* 2025-10-31 14:58 IDT — Shared MCQ sizing */
+        :root {
+            /* One knob for main MCQ typography (term + options) */
+            --mcq-font-size: clamp(22px, 2.6vw, 38px);
+        }
+
+        /* Unified status/progress area at top ("1/4 • Demo MCQ") */
+        .statusbar {
+            position: relative;
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            flex-wrap: wrap;
+            padding: 4px max(12px, calc((100vw - min(96%, 1100px)) / 2));
+            min-height: 28px;
+            color: #444;
+            font-size: clamp(11px, 1.4vw, 18px);
+            gap: 4px;
+        }
+
+        #statusBarText {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: clamp(16px, 2vw, 24px);
+            font-weight: 500;
+            text-align: center;
+            max-width: 90%;
+            direction: ltr;
+            unicode-bidi: embed;
+        }
+
+        #quizArea,
+        #doneArea {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        #termImageWrap {
+            margin: 8px auto 12px auto;
+            width: 100%;
+            max-width: clamp(320px, 60vw, 540px);
+            max-height: 25vh;
+            border-radius: 14px;
+            overflow: hidden;
+            display: none;
+        }
+
+        #termImageWrap.active {
+            display: block;
+        }
+
+        #termImageWrap img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .status-stats {
+            font-size: clamp(12px, 1vw, 14px);
+            margin-left: 12px;
+            color: #555;
+        }
+
+        /* term line: centered and same size as options */
+        .term {
+            font-weight: 800;
+            line-height: 1.25;
+            margin-top: 4px;
+            font-size: var(--mcq-font-size);
+            text-align: center;
+            color: #000;
+        }
+
+        .term-image {
+            margin: 12px auto 0 auto;
+            width: 100%;
+            max-width: clamp(280px, 60vw, 540px);
+            max-height: 35vh;
+            border-radius: 14px;
+            display: none;
+        }
+
+        .term-image.active {
+            display: block;
+        }
+
+        .term-image img {
+            width: 100%;
+            height: 100%;
+            border-radius: 14px;
+            object-fit: contain;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, .15);
+        }
+
+        #termText {
+            font-size: clamp(16px, 2.2vw, 34px);
+            line-height: 1.15;
+            overflow: hidden;
+            word-break: break-word;
+            hyphens: auto;
+        }
+
+        #termText[dir="auto"] {
+            text-align: start;
+        }
+
+        .answer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+
+            padding: 12px 16px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+
+            min-height: 72px;
+            /* base card height */
+            width: 100%;
+
+            white-space: normal;
+            /* allow multi-line text */
+            word-break: break-word;
+            /* break long words instead of overflowing */
+
+            font-size: clamp(0.95rem, 0.9rem + 0.2vw, 1.1rem);
+            line-height: 1.3;
+        }
+
+        .answers.is-flash {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 14px;
+        }
+
+        @media (min-width: 1024px) {
+            .answers {
+                grid-auto-rows: minmax(140px, 1fr);
+            }
+        }
+
+        /* On phones / narrow portrait: prefer 2 columns (2×2, 2×3) */
+        @media (max-width: 720px) and (orientation: portrait) {
+
+            .answers[data-count="4"],
+            .answers[data-count="6"],
+            .answers:not([data-count]) {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 18px;
+            }
+        }
+
+        /* Ultra-narrow (very small phones) → single column fallback */
+        @media (max-width: 360px) {
+
+            .answers[data-count],
+            .answers:not([data-count]) {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 900px) and (orientation: portrait) {
+            .answers[data-count="6"] {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        button.answer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 8px;
+            min-height: 0;
+            border-radius: 16px;
+            border: 1px solid #dcdcdc;
+            background: #f5f5f5;
+            color: #111;
+            font-size: var(--mcq-font-size);
+            line-height: 1.2;
+            cursor: pointer;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            transition: transform 100ms ease, background 100ms ease, border-color 100ms ease;
+            overflow: hidden;
+        }
+
+        body[data-theme="dark"] button.answer {
+            background: #2a2a2f;
+            border-color: #444;
+            color: #f5f5f5;
+        }
+
+        body[data-theme="dark"] .answer-label {
+            color: #f5f5f5;
+        }
+
+        @media (hover:hover) {
+            button.answer:hover {
+                background: #f3f3f3;
+                border-color: #cfcfcf;
+            }
+        }
+
+        button.answer:active {
+            transform: scale(0.997);
+        }
+
+        @media (max-width: 720px) {
+            .answers:not([data-count]) {
+                grid-template-columns: 1fr;
+                gap: 18px;
+            }
+        }
+
+        #termHeader {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            max-width: 1080px;
+            margin: 0 auto 8px auto;
+            padding: 0 4px;
+            max-height: 20vh;
+            overflow: hidden;
+        }
+
+        @media (max-width: 640px) {
+            #termHeader {
+                padding: 0 2px;
+                max-height: 15vh;
+            }
+        }
+
+        .audio-btn {
+            border: 1px solid #ccc;
+            background: #f7f7f7;
+            border-radius: 999px;
+            padding: 4px 8px;
+            line-height: 1;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .audio-btn.audio-only-mode {
+            font-size: clamp(80px, 15vw, 180px);
+            padding: 40px;
+            border: 3px solid #1976d2;
+            background: #e3f2fd;
+            box-shadow: 0 8px 24px rgba(25, 118, 210, 0.3);
+        }
+
+        body[data-theme="dark"] .audio-btn.audio-only-mode {
+            background: #1a3a52;
+            border-color: #42a5f5;
+        }
+
+        .audio-btn:active {
+            transform: scale(0.98);
+        }
+
+        .audio-btn[disabled] {
+            opacity: .5;
+            cursor: default;
+        }
+
+        button.answer.correct {
+            border-color: #1f7a1f;
+            outline: 2px solid #1f7a1f;
+            background: #f1fff1;
+        }
+
+        button.answer.incorrect {
+            border-color: #a11;
+            outline: 2px solid #a11;
+            background: #fff1f1;
+        }
+
+        button.answer:disabled {
+            opacity: 0.95;
+            pointer-events: none;
+        }
+
+        #termText {
+            margin: 0;
+            /* center in page */
+            padding: 0;
+            /* tiny side breathing */
+        }
+
+        /* Inner label for answers */
+        .answer-label {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            width: 100%;
+            padding: 0;
+            white-space: normal;
+            unicode-bidi: embed;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            hyphens: auto;
+            line-height: 1.15;
+            overflow: hidden;
+        }
+
+        /* Feedback */
+        .feedback {
+            min-height: 2.2em;
+            font-size: clamp(18px, 1.8vw, 26px);
+            line-height: 1.35;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .success {
+            color: #1f7a1f;
+        }
+
+        .error {
+            color: #a11;
+        }
+
+        /* Controls row */
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: space-between;
+            min-height: 44px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* 2025-10-31 14:58 IDT — Desktop-only: allow selecting/copying status + options text */
+        @media (pointer: fine) {
+            .statusbar {
+                user-select: text;
+                -webkit-user-select: text;
+            }
+
+            .answer-label {
+                user-select: text;
+                -webkit-user-select: text;
+            }
+        }
+
+        .flip-face {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            text-align: center;
+            font-size: var(--mcq-font-size);
+            line-height: 1.25;
+        }
+
+        .flip-front,
+        .flip-back {
+            background: #fff;
+            color: #000;
+        }
+
+        .flip-back {
+            transform: rotateY(180deg);
+        }
+
+        body[data-theme="dark"] .flip-front,
+        body[data-theme="dark"] .flip-back {
+            background: #2a2a2f;
+            color: #fff;
+        }
+
+        .fc-btn.correct {
+            border-color: #1f7a1f;
+            background: #f1fff1;
+        }
+
+        .fc-btn.almost {
+            border-color: #caa600;
+            background: #fff9e6;
+        }
+
+        .fc-btn.wrong {
+            border-color: #a11;
+            background: #fff1f1;
+        }
+
+        @media (pointer: fine) {
+            .flip-face {
+                user-select: text;
+                -webkit-user-select: text;
+            }
+        }
+
+        body[data-busy="1"] * {
+            cursor: progress !important;
+        }
+
+        .settings-wrap {
+            max-width: 90%;
+            margin: 10px auto 14px auto;
+            padding: 16px;
+            border: 1px dashed #ddd;
+            border-radius: 12px;
+            background: #fafafa;
+            font-size: 16px;
+        }
+
+        @media (max-width: 640px) {
+            .settings-wrap {
+                max-width: 95%;
+                padding: 20px;
+                font-size: 18px;
+            }
+        }
+
+        body[data-theme="dark"] .settings-wrap {
+            background: #2a2a2f;
+            border-color: #3a3a3f;
+        }
+
+        .settings-head {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 8px
+        }
+
+        .settings-head h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600
+        }
+
+        .settings-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 12px 16px;
+            align-items: center;
+        }
+
+        .settings-grid .label {
+            align-self: center;
+            font-size: 16px;
+        }
+
+        .settings-grid .control {
+            align-self: center;
+            justify-self: start;
+        }
+
+        @media (max-width: 640px) {
+            .settings-grid {
+                gap: 16px 20px;
+            }
+
+            .settings-grid .label {
+                font-size: 18px;
+            }
+        }
+
+        .settings-grid .meta {
+            display: none;
+        }
+
+        body[data-theme="dark"] .settings-grid .meta {
+            color: #aaa;
+        }
+
+        .settings-grid select,
+        .settings-grid input {
+            width: 150px;
+            box-sizing: border-box;
+            font-size: 16px;
+            padding: 8px;
+        }
+
+        @media (max-width: 640px) {
+
+            .settings-grid select,
+            .settings-grid input {
+                width: 180px;
+                font-size: 18px;
+                padding: 12px;
+                min-height: 44px;
+            }
+        }
+
+        .settings-grid [data-readonly="1"] {
+            opacity: 0.85;
+        }
+
+        .modal[hidden] {
+            display: none;
+        }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+        }
+
+        .modal-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.25);
+        }
+
+        .modal-card {
+            position: relative;
+            margin: 8vh auto 0 auto;
+            width: fit-content;
+            background: #fff;
+            border-radius: 14px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+            padding: 14px;
+        }
+
+        body[data-theme="dark"] .modal-card {
+            background: #1c1c1f;
+            color: #f3f3f3;
+        }
+
+        .modal-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .modal-close {
+            border: 1px solid #ccc;
+            background: #f7f7f7;
+            border-radius: 8px;
+            padding: 6px 10px;
+            cursor: pointer;
+        }
+
+        .statusbar .status-right {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .statusbar #menuBtn {
+            border: 1px solid #ccc;
+            background: #f7f7f7;
+            border-radius: 8px;
+            padding: 8px 12px;
+            line-height: 1.2;
+            cursor: pointer;
+            font-size: 18px;
+            margin-right: 8px;
+            min-height: 44px;
+            min-width: 44px;
+        }
+
+        @media (max-width: 640px) {
+            .statusbar #menuBtn {
+                font-size: 22px;
+                padding: 12px 16px;
+            }
+        }
+
+        .menu-dropdown {
+            position: fixed;
+            top: 40px;
+            left: max(12px, calc((100vw - min(96%, 1100px)) / 2));
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            padding: 12px;
+            z-index: 1000;
+            min-width: 180px;
+            font-size: 16px;
+        }
+
+        @media (max-width: 640px) {
+            .menu-dropdown {
+                min-width: 240px;
+                font-size: 18px;
+                padding: 16px;
+            }
+        }
+
+        .menu-dropdown[hidden] {
+            display: none !important;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            text-align: left;
+        }
+
+        .menu-item:last-child {
+            border-bottom: none;
+        }
+
+        .menu-item:hover {
+            background: #f5f5f5;
+        }
+
+        .menu-label {
+            font-size: 16px;
+        }
+
+        @media (max-width: 640px) {
+            .menu-label {
+                font-size: 18px;
+            }
+        }
+
+        .menu-arrow {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .menu-icon {
+            font-size: 14px;
+        }
+
+        .submenu {
+            position: fixed;
+            top: 40px;
+            left: calc(max(12px, calc((100vw - min(96%, 1100px)) / 2)) + 200px);
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            padding: 8px 0;
+            z-index: 1001;
+            min-width: 150px;
+        }
+
+        .submenu-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .submenu-item:hover {
+            background: #f5f5f5;
+        }
+
+        .submenu-item.active {
+            font-weight: 600;
+        }
+
+        .submenu-check {
+            font-size: 12px;
+            color: #1976d2;
+        }
+
+        body[data-theme="dark"] .menu-dropdown,
+        body[data-theme="dark"] .submenu {
+            background: #2a2a2f;
+            border-color: #444;
+        }
+
+        body[data-theme="dark"] .menu-item:hover,
+        body[data-theme="dark"] .submenu-item:hover {
+            background: #3a3a3f;
+        }
+
+        .menu-item {
+            display: block;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .menu-item:last-child {
+            border-bottom: none;
+        }
+
+        .menu-item label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .menu-item select {
+            width: 100%;
+            padding: 6px 8px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            background: #f7f7f7;
+        }
+
+        .menu-item button {
+            width: 100%;
+            border: 1px solid #ccc;
+            background: #f7f7f7;
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .settings-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 10px;
+        }
+
+        .btn {
+            border: 1px solid #ccc;
+            background: #f7f7f7;
+            border-radius: 8px;
+            padding: 6px 12px;
+            cursor: pointer;
+        }
+
+        .btn.primary {
+            background: #1a73e8;
+            border-color: #1a73e8;
+            color: #fff;
+        }
+
+        .btn[disabled] {
+            opacity: 0.6;
+            cursor: default;
+        }
+
+        /* [2025-11-04 23:16 IDT] Feedback + answer states */
+        #feedback {
+            margin-top: 8px;
+            min-height: 3.5em;
+            max-height: 3.5em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .answer.wrong {
+            background-color: #f44336;
+            color: #fff;
+            position: relative;
+        }
+
+        .answer.selected-wrong {
+            background: #ffe6e6;
+            border-color: #d32f2f;
+            color: #111;
+            position: relative;
+        }
+
+        body[data-theme="dark"] .answer.selected-wrong {
+            background: #4a1a1a;
+            border-color: #d32f2f;
+            color: #fff;
+        }
+
+        .answer.selected-wrong::after {
+            content: "✗";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 4.5em;
+            color: #d32f2f;
+            pointer-events: none;
+            line-height: 1;
+        }
+
+        /* 2025-11-07 17:10 IDT — MCQ layout: use same “card” space as flash and split into grid cells */
+        #termHeader[data-hide="1"] {
+            display: none;
+        }
+
+        /* Base container for answers (MCQ + flash) */
+        .answers {
+            margin: 0 auto;
+            max-width: clamp(720px, 90vw, 1100px);
+            padding: 0 12px;
+            flex: 1 1 auto;
+            overflow: hidden;
+        }
+
+        /* MCQ mode: big card area like flashcard, split into equal-height rows */
+        .answers:not(.is-flash) {
+            display: grid;
+            gap: 12px;
+            width: min(96%, 1100px);
+            max-height: min(74svh, 680px);
+            grid-auto-rows: minmax(0, 1fr);
+            align-items: stretch;
+            align-content: stretch;
+        }
+
+        /* Default (fallback) — 2 columns */
+        .answers:not(.is-flash):not([data-count]) {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        /* 4 options → 2×2 */
+        .answers:not(.is-flash)[data-count="4"] {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        /* 6 options → 3×2 on wide screens (overridden to 2×3 on portrait/narrow below) */
+        .answers:not(.is-flash)[data-count="6"] {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        /* FlashCard layout: keep using its own full-size flex layout */
+        .answers.is-flash {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            /* center horizontally */
+            justify-content: flex-start;
+            width: 100%;
+            max-width: clamp(720px, 90vw, 1100px);
+            margin: 0 auto;
+            padding: 8px 12px 12px;
+            gap: 16px;
+        }
+
+
+        .flash-wrap {
+            width: 100%;
+            height: 100%;
+            display: grid;
+            place-items: center;
+        }
+
+        .flip-card {
+            width: min(96%, 1100px);
+            max-height: min(74svh, 680px);
+            height: 100%;
+            perspective: 1200px;
+        }
+
+        .flip-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            transition: transform 500ms cubic-bezier(.25, .8, .25, 1);
+            border-radius: 18px;
+            border: 1px solid #ddd;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, .08);
+        }
+
+        body[data-theme="dark"] .flip-inner {
+            border-color: #444;
+        }
+
+        .flip-card.is-flipped .flip-inner {
+            transform: rotateY(180deg);
+        }
+
+        .flip-face {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: clamp(16px, 3vw, 32px);
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            text-align: center;
+            font-size: clamp(28px, 4.5vw, 64px);
+            line-height: 1.25;
+            border-radius: 18px;
+            overflow: hidden;
+            word-break: break-word;
+        }
+
+        .flip-front {
+            background: #fff;
+        }
+
+        .flip-back {
+            background: #fff;
+            transform: rotateY(180deg);
+        }
+
+        .flash-controls {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 14px;
+            padding-bottom: 8px;
+            margin: 0 auto;
+        }
+
+        /* hard-hide any controls that are not ready (or have [hidden]) */
+        .flash-controls[hidden],
+        .flash-controls[data-ready="0"] {
+            display: none !important;
+        }
+
+        .fc-btn {
+            display: grid;
+            place-items: center;
+            min-height: 60px;
+            min-width: clamp(140px, 22vw, 220px);
+            /* keep two nice big buttons */
+            font-size: clamp(18px, 2vw, 22px);
+            border-radius: 14px;
+            border: 1px solid #dcdcdc;
+            background: #f7f7f7;
+            cursor: pointer;
+            user-select: none;
+            transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease, border-color 120ms ease;
+        }
+
+        .fc-btn:active {
+            transform: scale(0.98);
+        }
+
+        .fc-btn.disabled {
+            opacity: .85;
+            cursor: default;
+        }
+
+        .fc-btn.picked {
+            box-shadow: 0 0 0 3px rgba(0, 0, 0, .05) inset;
+            transform: scale(0.995);
+        }
+
+        /* Subtle hint for which was correct (only applied to OK when wrong was picked) */
+        .fc-btn.hint {
+            outline: 2px dashed #1f7a1f;
+            outline-offset: 3px;
+        }
+
+        /* Card-level feedback glow */
+        .flip-card.flash-correct .flip-inner {
+            box-shadow: 0 0 0 3px #1f7a1f, 0 12px 28px rgba(31, 122, 31, .15);
+            border-radius: 18px;
+        }
+
+        .flip-card.flash-incorrect .flip-inner {
+            box-shadow: 0 0 0 3px #a11, 0 12px 28px rgba(170, 17, 17, .15);
+            border-radius: 18px;
+        }
+
+        .flip-card {
+            cursor: pointer;
+        }
+
+        .flip-inner {
+            transition: transform 500ms cubic-bezier(.25, .8, .25, 1), box-shadow 200ms;
+        }
+
+        .flip-card:hover .flip-inner {
+            box-shadow: 0 14px 36px rgba(0, 0, 0, .12);
+        }
+
+        .fc-btn.correct {
+            border-color: #1f7a1f;
+            background: #f1fff1;
+        }
+
+        .fc-btn.wrong {
+            border-color: #a11;
+            background: #fff1f1;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        @media (max-width: 640px) {
+
+            /* flashcard */
+            .flip-card {
+                width: min(96%, 1100px);
+            }
+
+            /* MCQ grid */
+            .answers:not(.is-flash) {
+                width: min(98%, 1100px);
+                gap: 12px;
+                padding: 0 4px;
+            }
+
+            /* term header line */
+            #termHeader {
+                padding: 0 8px;
+            }
+
+            button.answer {
+                padding: 4px;
+                line-height: 1.1;
+            }
+
+            .answer-label {
+                line-height: 1.1;
+            }
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <div id="configRow" class="row muted hidden"></div>
+    <div class="statusbar" aria-live="polite">
+        <button id="menuBtn" type="button" title="Menu">☰</button>
+        <span id="statusBarText">Loading…</span>
+    </div>
+
+    <div id="menuDropdown" class="menu-dropdown" hidden>
+        <div class="menu-item" id="studySetMenuItem">
+            <span class="menu-label">Study Set</span>
+            <span class="menu-arrow">▶</span>
+        </div>
+        <div class="menu-item" id="testModeMenuItem">
+            <span class="menu-label" id="testModeLabel">Test Mode</span>
+            <span class="menu-icon" id="testModeIcon">🧪</span>
+        </div>
+        <div class="menu-item" id="suspendMenuItem">
+            <span class="menu-label">Suspend</span>
+            <span class="menu-arrow">▶</span>
+        </div>
+        <div class="menu-item" id="settingsMenuItem">
+            <span class="menu-label">Settings</span>
+            <span class="menu-icon">⚙️</span>
+        </div>
+        <div class="menu-item" id="feedbackMenuItem">
+            <span class="menu-label">Send Feedback</span>
+            <span class="menu-icon">💬</span>
+        </div>
+        <div class="menu-item" id="changePasswordMenuItem">
+            <span class="menu-label">Change Password</span>
+            <span class="menu-icon">🔐</span>
+        </div>
+        <div class="menu-item" id="logoutMenuItem">
+            <span class="menu-label">Logout <span id="userIdDisplay"
+                    style="font-size: 0.85em; color: #666;"></span></span>
+            <span class="menu-icon">🚪</span>
+        </div>
+    </div>
+
+    <div id="studySetSubmenu" class="submenu" hidden>
+        <div id="studySetList"></div>
+    </div>
+
+    <div id="suspendSubmenu" class="submenu" hidden>
+        <div id="suspendBandList"></div>
+    </div>
+
+
+
+    <div id="loginModal" class="modal" hidden>
+        <div class="modal-backdrop" aria-hidden="true"></div>
+        <div class="modal-card">
+            <div class="settings-wrap">
+                <div class="settings-head">
+                    <h3>Sign In</h3>
+                </div>
+                <div class="settings-grid">
+                    <div class="label">Email:</div>
+                    <div class="control"><input id="loginEmail" type="email" placeholder="your@email.com"
+                            style="width: 200px;"></div>
+                    <div class="label">Password:</div>
+                    <div class="control">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <input id="loginPassword" type="password" placeholder="password" style="width: 200px;">
+                            <button id="loginPwToggle" type="button" class="pw-toggle" aria-pressed="false"
+                                aria-label="Show password"
+                                style="background:none;border:0;font-size:16px;cursor:pointer;">👁️</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-footer">
+                    <button id="loginBtn" class="btn primary" type="button">Sign In</button>
+                </div>
+                <div id="loginError" class="error" style="margin-top: 10px; display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="changePasswordModal" class="modal" hidden>
+        <div class="modal-backdrop" aria-hidden="true"></div>
+        <div class="modal-card">
+            <div class="settings-wrap">
+                <div class="settings-head">
+                    <h3>Change Password</h3>
+                </div>
+                <div class="settings-grid">
+                    <div class="label">Current password</div>
+                    <div class="control">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <input id="cpCurrent" type="password" placeholder="Current password" style="width:200px;">
+                            <button id="cpCurrentToggle" type="button" class="pw-toggle" aria-pressed="false"
+                                aria-label="Show current password"
+                                style="background:none;border:0;font-size:16px;cursor:pointer;">👁️</button>
+                        </div>
+                    </div>
+                    <div class="label">New password</div>
+                    <div class="control">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <input id="cpNew" type="password" placeholder="New password" style="width:200px;">
+                            <button id="cpNewToggle" type="button" class="pw-toggle" aria-pressed="false"
+                                aria-label="Show new password"
+                                style="background:none;border:0;font-size:16px;cursor:pointer;">👁️</button>
+                        </div>
+                    </div>
+                    <div class="label">Confirm new</div>
+                    <div class="control">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <input id="cpConfirm" type="password" placeholder="Confirm new password"
+                                style="width:200px;">
+                            <button id="cpConfirmToggle" type="button" class="pw-toggle" aria-pressed="false"
+                                aria-label="Show confirm password"
+                                style="background:none;border:0;font-size:16px;cursor:pointer;">👁️</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="cpError" class="error" style="margin-top:10px; display:none;"></div>
+                <div class="settings-footer">
+                    <button id="changePasswordCancelBtn" class="btn" type="button">Cancel</button>
+                    <button id="changePasswordSaveBtn" class="btn primary" type="button">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="settingsModal" class="modal" hidden>
+        <div class="modal-backdrop" id="settingsBackdrop" aria-hidden="true"></div>
+        <div class="modal-card">
+            <div class="settings-wrap" id="settingsWrap">
+                <div class="settings-head">
+                    <h3>Session Settings</h3>
+                    <span id="settingsHint" class="meta"></span>
+                </div>
+                <div class="settings-grid" id="settingsGrid"></div>
+                <div class="settings-footer">
+                    <button id="settingsCancelBtn" class="btn" type="button">Cancel</button>
+                    <button id="settingsSaveBtn" class="btn primary" type="button">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="feedbackModal" class="modal" hidden>
+        <div class="modal-backdrop" aria-hidden="true"></div>
+        <div class="modal-card" style="width: 500px; max-width: 90vw;">
+            <div class="settings-wrap">
+                <div class="settings-head">
+                    <h3>Send Feedback</h3>
+                </div>
+                <div style="margin: 10px 0;">
+                    <textarea id="feedbackText"
+                        placeholder="Share your feedback, report issues, or request access to study sets..."
+                        style="width: 100%; min-height: 150px; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit; font-size: 14px; resize: vertical;"></textarea>
+                    <div style="text-align: right; font-size: 12px; color: #666; margin-top: 4px;">
+                        <span id="feedbackCharCount">0</span> / 1000
+                    </div>
+                </div>
+                <div class="settings-footer">
+                    <button id="feedbackCancelBtn" class="btn" type="button">Cancel</button>
+                    <button id="feedbackSendBtn" class="btn primary" type="button">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="suspendModal" class="modal" hidden>
+        <div class="modal-backdrop" aria-hidden="true"></div>
+        <div class="modal-card" style="width: 600px; max-width: 90vw;">
+            <div class="settings-wrap">
+                <div class="settings-head">
+                    <h3 id="suspendModalTitle">Suspend Cards</h3>
+                </div>
+                <div style="margin: 10px 0;">
+                    <input id="suspendSearch" type="text" placeholder="Search cards..."
+                        style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; margin-bottom: 10px;">
+                    <div id="suspendCardList"
+                        style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; padding: 8px;">
+                        <!-- Cards will be populated here -->
+                    </div>
+                </div>
+                <div class="settings-footer">
+                    <button id="suspendCancelBtn" class="btn" type="button">Cancel</button>
+                    <button id="suspendSaveBtn" class="btn primary" type="button">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmModal" class="modal" hidden>
+        <div class="modal-backdrop" aria-hidden="true"></div>
+        <div class="modal-card" style="width: 400px; max-width: 90vw;">
+            <div class="settings-wrap">
+                <div class="settings-head">
+                    <h3 id="confirmTitle">Confirm</h3>
+                </div>
+                <div style="margin: 10px 0; font-size: 16px;" id="confirmMessage"></div>
+                <div class="settings-footer">
+                    <button id="confirmCancelBtn" class="btn" type="button">Cancel</button>
+                    <button id="confirmOkBtn" class="btn primary" type="button">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="quizArea">
+        <div id="termHeader">
+            <h1 id="termText" class="autoshrink" dir="auto"></h1>
+            <button id="audioBtn" class="audio-btn" hidden aria-label="Play term audio" title="Play audio">🔊</button>
+            <button id="suspendBtn" class="audio-btn" hidden aria-label="Suspend this card"
+                title="Suspend card">🚫</button>
+        </div>
+        <div id="termImageWrap" class="term-image">
+            <img id="termImage" alt="Term related visual" />
+        </div>
+
+        <div id="answers" class="answers"></div>
+        <div id="feedback" class="row feedback muted"></div>
+    </div>
+
+    <div id="doneArea" class="hidden">
+        <h3>Done!</h3>
+        <p class="row">Score: <span id="scoreText"></span></p>
+        <p class="row muted">Saved to <b>Results</b>.</p>
+        <div id="extraNewPrompt" class="row" style="display:flex; flex-direction:column; gap:6px; align-items:center;">
+            <span class="muted">Want to learn 5 more new items?</span>
+            <button id="extraNewBtn" class="btn primary" type="button">Study 5 more new items</button>
+        </div>
+    </div>
+
+
+    <script>
+        // Audio element and initialization (outside DOMContentLoaded)
+        let _audioEl = null;
+
+        function initAudioElement() {
+            if (!_audioEl) {
+                _audioEl = document.createElement('audio');
+                _audioEl.id = 'audio';
+                _audioEl.style.display = 'none';
+                if (document.body) {
+                    document.body.appendChild(_audioEl);
+                    console.log('[Audio] Element created and appended to body');
+                } else {
+                    console.warn('[Audio] Body not ready, will append later');
+                }
+            }
+            return _audioEl;
+        }
+
+        // Debug functions (outside DOMContentLoaded for console access)
+        window.debugAudio = () => {
+            const audio = _audioEl || initAudioElement();
+            console.log('Audio Element:', audio);
+            console.log('Audio Enabled:', typeof _audioEnabled !== 'undefined' ? _audioEnabled : 'not initialized');
+            console.log('Current URL:', typeof _currentAudioUrl !== 'undefined' ? _currentAudioUrl : 'not initialized');
+            console.log('Audio Src:', audio.src);
+            console.log('Audio Paused:', audio.paused);
+            console.log('Audio Ready State:', audio.readyState);
+            return { audio, _audioEnabled, _currentAudioUrl };
+        };
+
+        window.testAudio = (url) => {
+            const audio = _audioEl || initAudioElement();
+            const testUrl = url || 'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=he&q=test';
+            console.log('Testing audio with URL:', testUrl);
+            audio.src = testUrl;
+            return audio.play().then(() => {
+                console.log('✓ Audio played successfully');
+                return true;
+            }).catch(err => {
+                console.error('✗ Audio play failed:', err.name, '-', err.message);
+                return false;
+            });
+        };
+
+        function $(id) { return document.getElementById(id); }
+        function showToast(msg, type = 'info') {
+            const toast = document.createElement('div');
+            toast.textContent = msg;
+            toast.style.cssText = `position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:8px;font-size:14px;z-index:9999;${type === 'error' ? 'background:#d32f2f;color:#fff' : 'background:#333;color:#fff'}`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
+        }
+        function showError_(msg) {
+            const sb = $('statusBarText'), fb = $('feedback');
+            if (sb) sb.textContent = `Error: ${String(msg || 'Unknown error')}`;
+            if (fb) fb.innerHTML = `<span class="error">${sb ? sb.textContent : msg}</span>`;
+            log_(msg);
+        }
+
+        function showConfirm(message, onConfirm) {
+            const modal = $('confirmModal');
+            const messageEl = $('confirmMessage');
+            const okBtn = $('confirmOkBtn');
+            const cancelBtn = $('confirmCancelBtn');
+
+            if (!modal || !messageEl || !okBtn || !cancelBtn) return;
+
+            messageEl.textContent = message;
+            modal.hidden = false;
+
+            const cleanup = () => {
+                modal.hidden = true;
+                okBtn.onclick = null;
+                cancelBtn.onclick = null;
+            };
+
+            okBtn.onclick = () => {
+                cleanup();
+                if (onConfirm) onConfirm();
+            };
+
+            cancelBtn.onclick = cleanup;
+        }
+
+        // Match code.gs.js structure
+        const STUDY_SET_SCHEMA = {
+            term: 0,
+            image: 1,
+            band: 2,
+            definition: 3,
+            distractor1: 4,
+            distractor2: 5,
+            distractor3: 6
+        };
+        const USER_PROGRESS_SCHEMA = {
+            due: 0,
+            step: 1,
+            reps: 2,
+            lapses: 3,
+            suspended: 4,
+            tags: 5
+        };
+
+        const MOCK_ITEMS = [
+            ['האם אוטובוס הנוסע בנתיב שיועד לתחבורה ציבורית רשאי לעקוף רכב עוקף?', '', 'חוקי התנועה', 'רשאי.', 'רשאי, רק בדרך שאינה עירונית.', 'רשאי, רק כאשר הרכב העוקף הוא רכב משא.', 'רשאי, אם באוטובוס אין נוסעים.'],
+            ['האם מותר לנהוג ברכב כבד כאשר לחץ האוויר במערכת הבלימה נמוך מן המינימום הנדרש?', '', 'חוקי התנועה', 'אסור.', 'מותר, אבל רק באישור שוטר או קצין.', 'מותר, אבל רק אם יכולת העצירה של הרכב טובה.', 'מותר, אם ברור לחלוטין שאין דליפה.'],
+            ['מה פירוש התמרור?', 'https://www.gov.il/BlobFolder/generalpage/tq_pic_01/he/TQ_PIC_31073.jpg', 'חוקי התנועה', 'מספרה של דרך ראשית.', 'המרחק עד הכביש הקרוב (בק"מ).', 'מספרה של דרך מהירה.', 'המרחק עד לצומת הקרוב (בק"מ).'],
+            ['היכן תעצור כשבצומת שלפניך דולק ברמזור האור האדום?', 'https://www.gov.il/BlobFolder/generalpage/tq_pic_01/he/TQ_PIC_3190.jpg', 'תמרורים', 'לפני קו העצירה, ובאין קו עצירה - עצור לפני מעבר החצייה.', 'אחרי קו העצירה, ובאין קו עצירה – עצור לפני קו הצומת.', 'אחרי מעבר החצייה, ובאין מעבר חצייה – במקום שבו שדה הראייה הטוב ביותר.', 'תעצור תמיד במקום שבו שדה הראייה הוא הטוב ביותר.'],
+            ['איזה תמרור משמעותו "הולכי רגל בקרבת מקום"?', 'https://www.gov.il/BlobFolder/generalpage/tq_pic_01/he/TQ_PIC_3368.jpg', 'תמרורים', '136', '135', '226', '306']
+        ];
+
+        const MOCK_PROGRESS = [
+            ['', 0, 0, 0, 0, ''],
+            ['', 0, 0, 0, 0, ''],
+            ['', 0, 0, 0, 0, ''],
+            ['', 0, 0, 0, 0, ''],
+            ['', 0, 0, 0, 0, '']
+        ];
+
+        const MOCK_SET_SETTINGS = {
+            AudioEnabled: true,
+            AudioOnly: false,
+            DistractorsAsReference: false,
+            Ladder: '{1/1440;1/1440;3/1440;3/1440;10/1440;10/1440;30/1440;30/1440;12/24;2;4;7;14;30;60;90;105;115;120}',
+            Lang: 'he'
+        };
+
+        const MOCK_USER_SETTINGS = [
+            ['UserID', 'demo@example.com'],
+            ['NewItemsPerDay', 4],
+            ['QuizMode', false],
+            ['TestDueDate', '2025-01-01'],
+            ['ThemeLight', false],
+            ['AudioAutoPlay', true],
+            ['PlaybackSpeed', 1.5]
+        ];
+
+        const MOCK_CREDENTIALS = {
+            'demo@example.com': 'demo123',
+            'test@example.com': 'test456'
+        };
+
+        let payload = null; // { items, settings, schema, state }
+        let settings = []; // active settings for this run (editable)
+        let testState = null; // { setName, shuffledIndices, currentIndex, score, startTime, totalQuestions }
+        const DEBUG_MODE = true; // Set to false to disable all debug logging
+        function log_(...args) { if (DEBUG_MODE) console.log('[DEBUG]', ...args); }
+        function logBackendDebug(entries, label) {
+            if (!Array.isArray(entries) || entries.length === 0) return;
+            const title = label ? `[BACKEND DEBUG ${label}]` : '[BACKEND DEBUG]';
+            console.groupCollapsed(title);
+            entries.forEach(line => console.log('[BACK]', line));
+            console.groupEnd();
+        }
+
+        // Force performance logs to always show (bypass DEBUG_MODE)
+        console.log('[INIT] Performance logging enabled - you should see timing logs in console');
+
+        // Cloudflare Worker URL (proxies to Apps Script)
+        const API_URL = 'https://fsrs.haim-pekar.workers.dev/';
+        // Auto-detect local file:// protocol and force mock mode
+        const IS_LOCAL = window.location.protocol === 'file:';
+        const HAS_SERVER = !!API_URL && !IS_LOCAL;
+        const IS_MOCK = !HAS_SERVER; // single source of truth for mode
+
+        function shuffleArray(array) {
+            const shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+        let currentCredentials = null; // { email, password }
+
+        // Authentication helpers
+        function saveCredentials(email, password, setName = null) {
+            const creds = { email, password, setName };
+            localStorage.setItem('userCredentials', JSON.stringify(creds));
+            currentCredentials = creds;
+        }
+
+        function loadCredentials() {
+            try {
+                const stored = localStorage.getItem('userCredentials');
+                if (stored) {
+                    currentCredentials = JSON.parse(stored);
+                    return currentCredentials;
+                }
+            } catch (e) {
+                log_('Failed to load credentials:', e);
+            }
+            return null;
+        }
+
+        function clearCredentials() {
+            localStorage.removeItem('userCredentials');
+            currentCredentials = null;
+        }
+
+        function showLoginModal() {
+            const modal = $('loginModal');
+            const emailInput = $('loginEmail');
+            const passwordInput = $('loginPassword');
+            const errorDiv = $('loginError');
+
+            if (modal) modal.hidden = false;
+            if (emailInput) {
+                emailInput.focus();
+                emailInput.value = '';
+            }
+            if (passwordInput) passwordInput.value = '';
+            if (errorDiv) errorDiv.style.display = 'none';
+        }
+
+        function hideLoginModal() {
+            const modal = $('loginModal');
+            if (modal) modal.hidden = true;
+        }
+
+        function validateEmail(email) {
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return re.test(email);
+        }
+
+        function showLoginError(message) {
+            const errorDiv = $('loginError');
+            if (errorDiv) {
+                errorDiv.textContent = message;
+                errorDiv.style.display = 'block';
+                errorDiv.style.color = '#a11';
+                errorDiv.style.whiteSpace = 'pre-line'; // Support multi-line messages
+            }
+        }
+
+        async function attemptLogin(email, password) {
+            // Frontend validation
+            if (!email || !password) {
+                showLoginError('Please fill in all fields');
+                return null;
+            }
+
+            if (!validateEmail(email)) {
+                showLoginError('Please enter a valid email address');
+                return null;
+            }
+
+            if (email.startsWith("'") || password.startsWith("'")) {
+                showLoginError('Email and password cannot start with an apostrophe');
+                return null;
+            }
+
+            // Show processing message
+            const errorDiv = $('loginError');
+            if (errorDiv) {
+                errorDiv.textContent = 'Processing...';
+                errorDiv.style.display = 'block';
+                errorDiv.style.color = '#666';
+            }
+
+            try {
+                const result = await service.getSession({ userId: email, password: password });
+                if (result.success !== false) {
+                    saveCredentials(email, password);
+                    hideLoginModal();
+                    return result;
+                } else {
+                    // Handle specific error messages from backend
+                    let errorMsg;
+                    if (result.error === 'NEW_USER_REGISTERED') {
+                        const sets = result.availableSets || [];
+                        const adminEmail = result.adminEmail || 'administrator';
+                        errorMsg = `Account created! To start learning, contact administrator (${adminEmail}) to enable access to:\n\n` +
+                            sets.map(s => '• ' + s).join('\n');
+                    } else if (result.error === 'USER_NOT_FOUND') {
+                        errorMsg = 'User not found. Please contact administrator';
+                    } else if (result.error === 'WRONG_PASSWORD') {
+                        errorMsg = 'Incorrect password. Try again or contact administrator';
+                    } else {
+                        errorMsg = 'Login failed. Please try again';
+                    }
+                    showLoginError(errorMsg);
+                    return null;
+                }
+            } catch (e) {
+                showLoginError('Connection error. Please try again');
+                return null;
+            }
+        }
+        const AUTOSAVE_EVERY = 10;   // save after every 10 answers
+        const MIN_REVIEW_INTERVAL_MS = 6 * 60 * 60 * 1000; // allow reviewing items due within 6 hours
+        let _lastSavedAnswerCount = 0;
+        const DISTRACTOR_KEYS = ['distractor1', 'distractor2', 'distractor3'];
+
+        // Async save queue
+        const SaveQueue = {
+            queue: [],
+            processing: false,
+
+            add(saveType, data) {
+                // Capture credentials NOW to avoid null reference when process() runs later
+                const credentials = {
+                    userId: currentCredentials?.email,
+                    password: currentCredentials?.password,
+                    activeSet: payload?.activeSet
+                };
+
+                // Validate we have credentials before queueing
+                if (!credentials.userId || !credentials.password) {
+                    log_('[SaveQueue] Cannot queue save - no credentials');
+                    showToast('Not logged in - changes not saved', 'error');
+                    return;
+                }
+
+                // Deduplicate: remove older saves of same type
+                if (saveType === 'progress' || saveType === 'settings') {
+                    this.queue = this.queue.filter(item => item.saveType !== saveType);
+                }
+                const item = { saveType, data, credentials, attempts: 0, timestamp: Date.now() };
+                this.queue.push(item);
+                localStorage.setItem('saveQueue', JSON.stringify(this.queue));
+                this.process();
+            },
+
+            async process() {
+                if (this.processing || this.queue.length === 0) return;
+                this.processing = true;
+
+                while (this.queue.length > 0) {
+                    const item = this.queue[0];
+
+                    // Use stored credentials from when save was queued
+                    const creds = item.credentials || {
+                        userId: currentCredentials?.email,
+                        password: currentCredentials?.password,
+                        activeSet: payload?.activeSet
+                    };
+
+                    // Skip if no valid credentials
+                    if (!creds.userId || !creds.password) {
+                        log_('[SaveQueue] Skipping save - no credentials for:', item.saveType);
+                        this.queue.shift();
+                        localStorage.setItem('saveQueue', JSON.stringify(this.queue));
+                        continue;
+                    }
+
+                    try {
+                        await service.saveSession({
+                            userId: creds.userId,
+                            password: creds.password,
+                            activeSet: creds.activeSet,
+                            ...item.data
+                        });
+                        this.queue.shift();
+                        localStorage.setItem('saveQueue', JSON.stringify(this.queue));
+                        showToast(`Saved ${item.saveType}`);
+
+                        // Update local IndexedDB cache (DeckCache) so cached session
+                        // reflects the newly-saved settings/progress immediately.
+                        try {
+                            if (typeof DeckCache !== 'undefined' && currentCredentials && currentCredentials.email) {
+                                const cacheKey = `${currentCredentials.email}_${currentCredentials.setName || 'default'}`;
+
+                                // Build a lightweight session object compatible with the cached shape
+                                const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
+                                const sess = {
+                                    success: true,
+                                    userId: String(currentCredentials.email),
+                                    activeSet: payload?.activeSet || creds.activeSet || '',
+                                    availableSets: payload?.availableSets || [],
+                                    setSettings: payload?.setSettings || {},
+                                    cards: Array.isArray(payload?.items) ? payload.items.map(r => Array.isArray(r) ? r.slice(0, cardWidth) : []) : [],
+                                    userSettings: Array.isArray(settings) ? settings.map(r => Array.isArray(r) ? r.slice() : []) : (payload?.settings || []),
+                                    userProgress: Array.isArray(payload?.items) ? payload.items.map(r => Array.isArray(r) ? r.slice(cardWidth) : []) : [],
+                                    studySetSchema: payload?.schema || {},
+                                    userProgressSchema: payload?.userProgressSchema || {},
+                                    adminEmail: payload?.adminEmail || ''
+                                };
+
+                                DeckCache.set(cacheKey, sess).catch(e => log_('[DeckCache] set failed after save:', e));
+                            }
+                        } catch (e) {
+                            log_('Failed to update local cache after save:', e);
+                        }
+                    } catch (err) {
+                        item.attempts++;
+                        if (item.attempts >= 3) {
+                            log_('[SaveQueue] Failed after 3 attempts:', item.saveType, err);
+                            showToast(`Failed to save ${item.saveType}`, 'error');
+                            this.queue.shift();
+                        } else {
+                            log_(`[SaveQueue] Retry ${item.attempts}/3 for ${item.saveType}:`, err.message);
+                            await new Promise(r => setTimeout(r, 1000 * item.attempts));
+                        }
+                        localStorage.setItem('saveQueue', JSON.stringify(this.queue));
+                    }
+                }
+
+                this.processing = false;
+            },
+
+            restore() {
+                try {
+                    const stored = localStorage.getItem('saveQueue');
+                    if (stored) {
+                        this.queue = JSON.parse(stored);
+                        if (this.queue.length > 0) {
+                            log_('[SaveQueue] Restored ' + this.queue.length + ' pending saves');
+                            this.process();
+                        }
+                    }
+                } catch (e) {
+                    log_('[SaveQueue] Restore failed:', e);
+                }
+            }
+        };
+
+        function buildLexiconSchema(studySetSchema, userProgressSchema) {
+            log_('[buildLexiconSchema] Building merged schema');
+            const offset = Object.keys(studySetSchema).length;
+            const merged = { ...studySetSchema };
+            for (const key in userProgressSchema) {
+                merged[key] = userProgressSchema[key] + offset;
+            }
+            log_('[buildLexiconSchema] Merged keys: ' + Object.keys(merged).join(', '));
+            return merged;
+        }
+
+        // Retry wrapper for transient network errors
+        let frontendRetryCount = 0;
+        async function retryWithBackoff(fn, maxRetries = 2) {
+            for (let attempt = 0; attempt <= maxRetries; attempt++) {
+                try {
+                    const result = await fn();
+                    if (attempt > 0) {
+                        frontendRetryCount += attempt;
+                        log_(`[retry] Succeeded after ${attempt} retry(ies)`);
+                    }
+                    return result;
+                } catch (err) {
+                    if (attempt === maxRetries) {
+                        if (attempt > 0) {
+                            frontendRetryCount += attempt;
+                            log_(`[retry] Failed after ${attempt} retry(ies)`);
+                        }
+                        throw err;
+                    }
+                    const delay = 1000 * Math.pow(2, attempt); // 1s, 2s
+                    log_(`[retry] Attempt ${attempt + 1}/${maxRetries} failed, waiting ${delay}ms`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        }
+
+        // API service using fetch() instead of google.script.run
+        const service = HAS_SERVER ? {
+            getSession: (arg) => retryWithBackoff(async () => {
+                const t0 = performance.now();
+                console.log(`[PERF→FRONT] getSession START`);
+                const t1 = performance.now();
+                const payload = JSON.stringify({ action: 'getSession', ...arg });
+                console.log(`[PERF→FRONT] JSON.stringify ${Math.round(performance.now() - t1)}ms`);
+                const t2 = performance.now();
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: payload
+                });
+                console.log(`[PERF→FRONT] fetch() ${Math.round(performance.now() - t2)}ms`);
+                const t3 = performance.now();
+                const result = await response.json();
+                console.log(`[PERF→FRONT] response.json() ${Math.round(performance.now() - t3)}ms`);
+                const size = JSON.stringify(result).length;
+                console.log(`[PERF→FRONT] getSession TOTAL ${Math.round(performance.now() - t0)}ms`);
+                console.log(`[FRONT←BACK] getSession ${(size / 1024).toFixed(1)}KB ${Math.round(performance.now() - t0)}ms`);
+                if (result && Array.isArray(result.debugLog) && result.debugLog.length) {
+                    logBackendDebug(result.debugLog, 'getSession');
+                }
+                if (result === null || result === undefined) {
+                    throw new Error('Server returned null');
+                }
+                return result;
+            }),
+            saveSession: (payload) => retryWithBackoff(async () => {
+                const t0 = performance.now();
+                const size = JSON.stringify(payload).length;
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'saveSession', ...payload })
+                });
+                const result = await response.json();
+                const answered = payload?.data ? `answered=${_lastSavedAnswerCount}` : '';
+                log_(`[FRONT→BACK] saveSession(${payload.saveType}) ${answered} ${(size / 1024).toFixed(1)}KB ${Math.round(performance.now() - t0)}ms`);
+                if (result && Array.isArray(result.debugLog) && result.debugLog.length) {
+                    logBackendDebug(result.debugLog, 'saveSession');
+                }
+                return result;
+            }),
+            changePassword: (payload) => retryWithBackoff(async () => {
+                const t0 = performance.now();
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'changePassword', ...payload })
+                });
+                const result = await response.json();
+                log_(`[FRONT→BACK] changePassword ${(result && result.success) ? 'OK' : 'FAIL'} ${Math.round(performance.now() - t0)}ms`);
+                return result;
+            }),
+
+        } : {
+            _lastSaved: null,
+            async getSession(arg) {
+                // Validate credentials in mock mode
+                if (arg && arg.userId && arg.password) {
+                    const email = String(arg.userId).toLowerCase();
+                    const password = String(arg.password);
+
+                    if (!MOCK_CREDENTIALS[email]) {
+                        return { success: false, error: 'USER_NOT_FOUND' };
+                    }
+
+                    if (MOCK_CREDENTIALS[email] !== password) {
+                        return { success: false, error: 'WRONG_PASSWORD' };
+                    }
+                }
+
+                const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
+                const cards = MOCK_ITEMS;
+                const userProgress = MOCK_PROGRESS;
+                const userIdRow = MOCK_USER_SETTINGS.find(r => r[0] === 'UserID');
+                if (!userIdRow || !userIdRow[1]) {
+                    return { success: false, error: 'MOCK_USER_SETTINGS missing UserID' };
+                }
+                return {
+                    success: true,
+                    userId: userIdRow[1],
+                    activeSet: 'TestSet',
+                    availableSets: ['TestSet'],
+                    setSettings: MOCK_SET_SETTINGS,
+                    cards: cards,
+                    userSettings: MOCK_USER_SETTINGS,
+                    userProgress: userProgress,
+                    studySetSchema: STUDY_SET_SCHEMA,
+                    userProgressSchema: USER_PROGRESS_SCHEMA
+                };
+            },
+            async saveSession(payload) {
+                this._lastSaved = payload;
+                return { success: true };
+            }
+            ,
+            async changePassword(arg) {
+                if (!arg || !arg.userId || !arg.currentPassword || !arg.newPassword) return { success: false, error: 'MISSING_FIELDS' };
+                const email = String(arg.userId).toLowerCase();
+                const cur = String(arg.currentPassword);
+                const nw = String(arg.newPassword);
+                if (!MOCK_CREDENTIALS[email]) return { success: false, error: 'USER_NOT_FOUND' };
+                if (MOCK_CREDENTIALS[email] !== cur) return { success: false, error: 'WRONG_PASSWORD' };
+                MOCK_CREDENTIALS[email] = nw;
+                return { success: true };
+            }
+        };
+
+        async function maybeAutosave_() {
+            const answered = payload?.state?.answeredCount || 0;
+            if (answered - _lastSavedAnswerCount < AUTOSAVE_EVERY) return;
+
+            _lastSavedAnswerCount = answered;
+            const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
+            const userProgress = payload.items.map(row => row.slice(cardWidth));
+
+            SaveQueue.add('progress', {
+                saveType: 'progress',
+                data: userProgress
+            });
+        }
+
+        function parseSettingOptions_(raw) {
+            if (!raw) return [];
+            const t = String(raw).trim();
+            if (!t) return [];
+            if (t[0] === '{' || t[0] === '[') {
+                try {
+                    const j = JSON.parse(t);
+                    return Array.isArray(j) ? j : [j];
+                } catch (e) { /* fall through to pipe */ }
+            }
+            // Support escaping \| inside a value.
+            return t.split(/(?<!\\)\|/).map(s => s.replace(/\\\|/g, '|').trim()).filter(Boolean);
+        }
+
+        function parseDue_(v) {
+            if (!v) return 0;
+            const d = new Date(v);
+            return isNaN(d.getTime()) ? 0 : d;
+        }
+
+        function parseLadder_(raw) {
+            const txt = String(raw || '').trim();
+            if (!txt) return [];
+            const parts = txt.replace(/[{}]/g, '').split(';').map(s => s.trim()).filter(Boolean);
+            return parts.map(p => {
+                if (p.includes('/')) {
+                    const [num, den] = p.split('/').map(Number);
+                    if (Number.isFinite(num) && Number.isFinite(den) && den > 0) return num / den; // days as decimal
+                }
+                const n = Number(p);
+                return Number.isFinite(n) ? n : 0;
+            }).map(d => Math.max(0, d));
+        }
+
+
+        function toIsoDateString_(val) {
+            if (!val) return '';
+            const str = String(val).trim();
+            // If already in YYYY-MM-DD format, return as-is
+            if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+            // Otherwise try to parse and format
+            try {
+                const d = new Date(str);
+                if (isNaN(d.getTime())) return '';
+                const y = d.getUTCFullYear();
+                const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+                const day = String(d.getUTCDate()).padStart(2, '0');
+                return `${y}-${m}-${day}`;
+            } catch (e) {
+                return '';
+            }
+        }
+
+        let _audioSrc = '';
+        let _audioEnabled = false;
+        let _audioAllowed = false;
+        let _currentAudioUrl = '';
+        let _audioRequestId = 0;
+
+        function initAudioStateFromSettings() {
+            try {
+                const val = getSetting('AudioAutoPlay');
+                _audioAllowed = (val === true || val === 'true');
+                _audioEnabled = _audioAllowed;
+            } catch (e) {
+                _audioAllowed = true;
+                _audioEnabled = true;
+            }
+        }
+
+        function resolveAudioUrlForRow(row) {
+            const C = payload.schema.lexiconCols || buildLexiconSchema(STUDY_SET_SCHEMA, USER_PROGRESS_SCHEMA);
+
+            // TTS from term (audio column removed from schema)
+            const term = (row && row[C.term] != null) ? String(row[C.term]).trim() : '';
+            if (!term) return '';
+
+            if (!payload?.setSettings) throw new Error('Missing payload.setSettings');
+            const lang = String(payload.setSettings.Lang || 'en').trim();
+
+            // Route through Cloudflare Worker proxy to bypass CORS
+            const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(lang)}&q=${encodeURIComponent(term)}`;
+            return `${API_URL}?action=audio&url=${encodeURIComponent(ttsUrl)}`;
+        }
+
+        async function playAudioUrl(url) {
+            if (!url) return false;
+
+            const audio = _audioEl || initAudioElement();
+            const requestId = ++_audioRequestId;
+
+            try {
+                audio.pause();
+                audio.currentTime = 0;
+            } catch { }
+
+            try {
+                if (requestId !== _audioRequestId) return false;
+
+                log_('[Audio] Playing URL:', url);
+                audio.src = url;
+
+                let rate = 1;
+                try {
+                    const currentIndex = payload?.state?.currentIndex;
+                    if (currentIndex >= 0 && payload?.items) {
+                        const C = payload.schema.lexiconCols;
+                        const row = payload.items[currentIndex];
+                        const term = String(row[C.term] || '').trim();
+                        rate = term.length <= 5 ? 1 : (Number(getSetting('PlaybackSpeed')) || 1.5);
+                    } else {
+                        rate = Number(getSetting('PlaybackSpeed')) || 1.5;
+                    }
+                } catch (e) {
+                    rate = 1;
+                }
+
+                audio.playbackRate = rate;
+
+                if (requestId !== _audioRequestId) return false;
+
+                await audio.play();
+                log_('[Audio] Playing successfully');
+                _audioSrc = url;
+
+                return true;
+            } catch (e) {
+                log_('[Audio] Play failed:', e.message);
+                return false;
+            }
+        }
+
+        function updateAudioUIForCurrentRow(hasAudio) {
+            const audioBtn = $('audioBtn');
+            const termEl = $('termText');
+            if (!audioBtn || !termEl) return;
+
+            audioBtn.hidden = !hasAudio;
+
+            if (!hasAudio) {
+                audioBtn.disabled = true;
+                audioBtn.setAttribute('aria-pressed', 'false');
+                termEl.style.cursor = 'default';
+                termEl.onclick = null;
+                audioBtn.onclick = null;
+                return;
+            }
+
+            audioBtn.disabled = false;
+            const isAudioOnly = audioBtn.classList.contains('audio-only-mode');
+
+            // Icon according to current toggle state
+            audioBtn.textContent = _audioEnabled ? '🔊' : '🔇';
+            audioBtn.setAttribute('aria-pressed', _audioEnabled ? 'true' : 'false');
+
+            // Term click: always replays when audio is present (regardless of toggle)
+            termEl.style.cursor = _audioEnabled ? 'pointer' : 'default';
+            termEl.onclick = (_audioEnabled && _currentAudioUrl)
+                ? () => { playAudioUrl(_currentAudioUrl); }
+                : null;
+
+            // Button click: in AudioOnly mode always replay, otherwise toggle
+            audioBtn.onclick = () => {
+                // Check if we're in AudioOnly mode
+                const isAudioOnly = audioBtn.classList.contains('audio-only-mode');
+
+                if (isAudioOnly) {
+                    // AudioOnly mode: always replay
+                    playAudioUrl(_currentAudioUrl);
+                    return;
+                }
+
+                // Normal mode: toggle audio on/off
+                _audioEnabled = !_audioEnabled;
+
+                // Stop audio if turning off
+                if (!_audioEnabled) {
+                    const audio = _audioEl || initAudioElement();
+                    if (audio && !audio.paused) {
+                        try {
+                            audio.pause();
+                            audio.currentTime = 0;
+                        } catch (e) {
+                            log_('failed to stop audio', e);
+                        }
+                    }
+                }
+
+                // Mirror back into settings so it can be persisted
+                try {
+                    const row = settings.find(r =>
+                        Array.isArray(r) && String(r[0]) === 'AudioAutoPlay'
+                    );
+                    if (row) {
+                        row[1] = _audioEnabled;
+                    }
+                } catch (e) {
+                    log_('failed to mirror AudioAutoPlay to settings', e);
+                }
+
+                updateAudioUIForCurrentRow(hasAudio);
+            };
+        }
+
+        function setFeedback_(html) {
+            const fb = $('feedback');
+            if (fb) fb.innerHTML = html || '';
+        }
+
+        function computeSessionStats() {
+            if (!payload || !Array.isArray(payload.items)) {
+                return { remainingNew: 0, remainingReview: 0 };
+            }
+            const C = payload.schema.lexiconCols || buildLexiconSchema(STUDY_SET_SCHEMA, USER_PROGRESS_SCHEMA);
+            const now = Date.now();
+            const baseNewLimit = getSetting('NewItemsPerDay', true);
+            const extraNew = Number(payload?.state?.extraNewItems || 0);
+            const limitNew = baseNewLimit + extraNew;
+            const servedNew = Number(payload?.state?.servedNewToday || 0);
+            const remainingNew = Math.max(0, limitNew - servedNew);
+
+            let remainingReview = 0;
+            for (const row of payload.items) {
+                if (!row) continue;
+                if (row[C.suspended]) continue;
+                const due = parseDue_(row[C.due]);
+                const isDue = (due instanceof Date) && ((due.getTime() - MIN_REVIEW_INTERVAL_MS) <= now);
+                if (isDue) remainingReview++;
+            }
+            return { remainingNew, remainingReview };
+        }
+
+        function updateSessionStats() {
+            const el = $('statusBarText');
+            if (!el) return;
+            const stats = computeSessionStats();
+            const deckName = payload?.activeSet || '';
+
+            // Build HTML with explicit direction control to prevent RTL/LTR mixing issues
+            if (deckName) {
+                el.innerHTML = `<span dir="auto">${deckName}</span><span dir="ltr"> - ${payload.state.answeredCount} answered · New: ${stats.remainingNew} · Review: ${stats.remainingReview}</span>`;
+            } else {
+                el.textContent = `${payload.state.answeredCount} answered · New: ${stats.remainingNew} · Review: ${stats.remainingReview}`;
+            }
+        }
+
+        function setProgress() {
+            updateSessionStats();
+        }
+
+        function countRemainingNewItems() {
+            if (!payload || !Array.isArray(payload.items)) return 0;
+            const C = payload.schema?.lexiconCols || buildLexiconSchema(STUDY_SET_SCHEMA, USER_PROGRESS_SCHEMA);
+            return payload.items.reduce((acc, row) => {
+                if (!row) return acc;
+                if (row[C.suspended]) return acc;
+                const due = parseDue_(row[C.due]);
+                const reps = Number(row[C.reps] || 0);
+                const step = Number(row[C.step] || 0);
+                const isNew = reps === 0 && step === 0 && !(due instanceof Date);
+                return acc + (isNew ? 1 : 0);
+            }, 0);
+        }
+
+        let settingsDraft = null;
+        // 2025-11-07 13:40 IDT — Settings as matrix: render using schema indices
+        const THEME_SETTING_NAME = 'ThemeLight';
+
+        function applyTheme() {
+            const body = document.body;
+            if (!body) return;
+            let isLight = true;
+            try {
+                const val = getSetting(THEME_SETTING_NAME);
+                isLight = val === true || val === 'true';
+            } catch (e) {
+                isLight = true;
+            }
+            body.dataset.theme = isLight ? 'light' : 'dark';
+        }
+
+        function renderSettingsUI(bundle) {
+            try {
+                const panel = $('settingsWrap');
+                const grid = $('settingsGrid');
+                const hint = $('settingsHint');
+                if (!panel || !grid) return;
+
+                const rows = Array.isArray(settingsDraft)
+                    ? settingsDraft
+                    : (Array.isArray(bundle?.settings)
+                        ? bundle.settings.map(r => Array.isArray(r) ? r.slice() : [])
+                        : []);
+
+                settingsDraft = rows;
+                grid.innerHTML = '';
+
+                const canShow = (row) => {
+                    if (!Array.isArray(row) || !row.length) return false;
+                    const name = String(row[0] || '').trim();
+                    return name && name !== 'UserID';
+                };
+                const autoNewCtx = { newCtrl: null, newRow: null, dueCtrl: null };
+
+                const syncAutoNewRate = () => {
+                    const ctrl = autoNewCtx.newCtrl;
+                    if (!ctrl || !autoNewCtx.newRow) return;
+                    ctrl.disabled = false;
+                    ctrl.title = '';
+                    const dueCtrl = autoNewCtx.dueCtrl;
+                    if (!dueCtrl || !dueCtrl.value) return;
+                    const dueDate = new Date(dueCtrl.value);
+                    if (isNaN(dueDate.getTime())) return;
+                    const today = new Date();
+                    let daysUntil = Math.floor((dueDate - today) / 86400000);
+                    if (daysUntil <= 0) return;
+                    let days = daysUntil - 7;
+                    if (days <= 0) {
+                        days = Math.max(1, Math.floor(daysUntil / 2));
+                    }
+                    const totalNew = countRemainingNewItems();
+                    if (!totalNew) return;
+                    days = Math.max(days, 1);
+                    const perDay = Math.max(5, Math.ceil(totalNew / days));
+                    ctrl.value = perDay;
+                    autoNewCtx.newRow[1] = perDay;
+                    ctrl.disabled = true;
+                    ctrl.title = 'Auto-calculated from TestDueDate';
+                };
+
+                const visible = rows.filter(r => canShow(r));
+                if (!visible.length) {
+                    panel.hidden = true;
+                    return;
+                }
+                panel.hidden = false;
+                hint.textContent = '';
+
+                for (const r of visible) {
+                    const name = String(r[0] ?? '');
+                    const value = r[1];
+                    const editable = canShow(r);
+                    const isRO = !editable;
+
+                    const label = document.createElement('div');
+                    label.className = 'label';
+                    label.textContent = name;
+
+                    const ctrlWrap = document.createElement('div');
+                    ctrlWrap.className = 'control';
+                    ctrlWrap.dataset.readonly = isRO ? '1' : '0';
+
+                    let ctrl = null;
+                    const updateSettingValue = () => {
+                        if (!ctrl) return;
+                        if (name === 'QuizMode' || name === 'ThemeLight' || name === 'AudioAutoPlay') {
+                            r[1] = ctrl.value === 'true';
+                        } else if (name === 'NewItemsPerDay' || name === 'PlaybackSpeed') {
+                            r[1] = Number(ctrl.value);
+                        } else {
+                            r[1] = ctrl.value;
+                        }
+                        if (name === 'ThemeLight') {
+                            applyTheme();
+                        }
+                        if (name === 'TestDueDate') {
+                            syncAutoNewRate();
+                        }
+                    };
+                    if (name === 'TestDueDate') {
+                        ctrl = document.createElement('input');
+                        ctrl.type = 'date';
+                        const v = String(value ?? '').trim();
+                        let isoVal = v;
+                        // Ensure it's in YYYY-MM-DD format
+                        if (!/^\d{4}-\d{2}-\d{2}$/.test(isoVal)) {
+                            const d = new Date();
+                            isoVal = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+                            r[1] = isoVal;
+                        }
+                        ctrl.value = isoVal;
+                        ctrl.placeholder = 'YYYY-MM-DD';
+                        ctrl.id = `setting_${name}`;
+                        autoNewCtx.dueCtrl = ctrl;
+                    } else if (name === 'NewItemsPerDay') {
+                        ctrl = document.createElement('input');
+                        ctrl.type = 'number';
+                        ctrl.value = String(value ?? '');
+                    } else if (name === 'PlaybackSpeed') {
+                        // Render playback speed with centered numeric value ABOVE the slider
+                        const wrapper = document.createElement('div');
+                        wrapper.style.display = 'flex';
+                        wrapper.style.flexDirection = 'column';
+                        wrapper.style.alignItems = 'center';
+
+                        const valueEl = document.createElement('div');
+                        valueEl.style.textAlign = 'center';
+                        valueEl.style.marginBottom = '6px';
+                        valueEl.className = 'playback-value';
+
+                        ctrl = document.createElement('input');
+                        ctrl.type = 'range';
+                        ctrl.min = '0.25';
+                        ctrl.max = '4';
+                        ctrl.step = '0.25';
+                        ctrl.value = String(value ?? '1');
+                        // Do not force full-width here; let the existing
+                        // `.settings-grid input` CSS rules control sizing so the
+                        // slider matches other controls exactly.
+                        ctrl.style.margin = '0';
+                        ctrl.style.padding = '0';
+
+                        // Put the numeric value above the slider in the center
+                        wrapper.appendChild(valueEl);
+                        wrapper.appendChild(ctrl);
+                        // Place wrapper into ctrlWrap instead of raw ctrl element
+                        ctrlWrap.appendChild(wrapper);
+                        // Mark ctrl as already appended so later code does not append again
+                        ctrl._appendedViaWrapper = true;
+                    } else if (name === 'QuizMode' || name === 'ThemeLight' || name === 'AudioAutoPlay') {
+                        ctrl = document.createElement('select');
+                        const opts = [['true', 'Yes'], ['false', 'No']];
+                        for (const [val, label] of opts) {
+                            const o = document.createElement('option');
+                            o.value = val;
+                            o.textContent = label;
+                            if (String(value) === val) o.selected = true;
+                            ctrl.appendChild(o);
+                        }
+                    } else {
+                        ctrl = document.createElement('input');
+                        ctrl.type = 'text';
+                        ctrl.value = String(value ?? '');
+                    }
+
+                    if (name === 'NewItemsPerDay' && ctrl) {
+                        autoNewCtx.newCtrl = ctrl;
+                        autoNewCtx.newRow = r;
+                    }
+
+                    if (ctrl) {
+                        ctrl.id = `setting_${name}`;
+                        if (isRO) {
+                            ctrl.disabled = true;
+                            ctrl.title = 'Read-only';
+                        } else {
+                            if (name === 'TestDueDate') {
+                                ctrl.addEventListener('input', () => {
+                                    updateSettingValue();
+                                    syncAutoNewRate();
+                                });
+                            } else {
+                                ctrl.addEventListener('input', updateSettingValue);
+                            }
+                        }
+                        // If we already appended the ctrl inside a wrapper (PlaybackSpeed), skip appending here
+                        if (!ctrl._appendedViaWrapper) {
+                            ctrlWrap.appendChild(ctrl);
+                        }
+                    }
+
+                    const meta = document.createElement('div');
+                    meta.className = 'meta';
+                    meta.textContent = '';
+
+                    grid.appendChild(label);
+                    grid.appendChild(ctrlWrap);
+                    grid.appendChild(meta);
+
+                    // Show current numeric value for PlaybackSpeed ABOVE the slider and centered
+                    if (name === 'PlaybackSpeed' && ctrl) {
+                        try {
+                            const fmt = (v) => {
+                                const n = Number(v);
+                                if (!Number.isFinite(n)) return String(v);
+                                return n.toFixed(2).replace(/\.?(0+)$/, '').replace(/\.$/, '');
+                            };
+
+                            // Find the playback value element we created earlier (if any)
+                            const pv = ctrlWrap.querySelector('.playback-value');
+                            if (pv) {
+                                pv.textContent = `×${fmt(ctrl.value)}`;
+                                ctrl.addEventListener('input', () => {
+                                    pv.textContent = `×${fmt(ctrl.value)}`;
+                                });
+                            }
+                        } catch (e) {
+                            log_('Failed to attach PlaybackSpeed display', e);
+                        }
+                    }
+                }
+                syncAutoNewRate();
+            } catch (e) {
+                log_('renderSettingsUI failed', e);
+            }
+        }
+
+        function autoAdjustNewItemsPerDay() {
+            try {
+                const dueStr = getSetting('TestDueDate');
+                if (!dueStr) return;
+                const dueDate = new Date(dueStr);
+                if (isNaN(dueDate.getTime())) return;
+
+                const totalNew = countRemainingNewItems();
+                if (!totalNew) return;
+
+                const today = new Date();
+                let daysUntil = Math.floor((dueDate - today) / 86400000);
+                if (daysUntil <= 0) return;
+                let usableDays = daysUntil - 7;
+                if (usableDays <= 0) {
+                    usableDays = Math.max(1, Math.floor(daysUntil / 2));
+                }
+                const perDay = Math.max(5, Math.ceil(totalNew / usableDays));
+
+                const newRow = (payload.settings || settings).find(r =>
+                    Array.isArray(r) && String(r[0]) === 'NewItemsPerDay'
+                );
+                if (newRow) {
+                    newRow[1] = perDay;
+                    settings = settings.map(r => Array.isArray(r) ? r.slice() : []);
+                    const row = settings.find(r => Array.isArray(r) && String(r[0]) === 'NewItemsPerDay');
+                    if (row) row[1] = perDay;
+                }
+            } catch (err) {
+                log_('autoAdjustNewItemsPerDay failed', err);
+            }
+        }
+
+        function getSetting(name, asNumber = false) {
+            const rows = Array.isArray(settings) ? settings : [];
+            const row = rows.find(r =>
+                Array.isArray(r) && String(r[0]) === String(name)
+            );
+            if (!row || row[1] == null) {
+                throw new Error(`Missing setting: ${name}`);
+            }
+            const raw = row[1];
+            if (!asNumber) return String(raw).trim();
+
+            const n = Number(raw);
+            if (!Number.isFinite(n)) {
+                throw new Error(`Setting ${name} must be a finite number`);
+            }
+            return n;
+        }
+
+        function startTestMode() {
+            if (!payload || !payload.items || payload.items.length === 0) {
+                showError_('No study set loaded');
+                return;
+            }
+
+            // Initialize test state - exclude suspended cards
+            const C = payload.schema.lexiconCols;
+            const indices = [];
+            for (let i = 0; i < payload.items.length; i++) {
+                const row = payload.items[i];
+                if (row && !row[C.suspended]) {
+                    indices.push(i);
+                }
+            }
+
+            if (indices.length === 0) {
+                showError_('No cards available for testing (all suspended)');
+                return;
+            }
+
+            testState = {
+                setName: payload.activeSet || 'Test',
+                shuffledIndices: shuffleArray(indices),
+                currentIndex: 0,
+                score: 0,
+                startTime: new Date(),
+                totalQuestions: indices.length,
+                sessionId: Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+            };
+
+            // Update menu item
+            const label = $('testModeLabel');
+            const icon = $('testModeIcon');
+            if (label) label.textContent = 'Learn Mode';
+            if (icon) icon.textContent = '📚';
+
+            // Update UI for test mode
+            $('quizArea').classList.remove('hidden');
+            $('doneArea').classList.add('hidden');
+
+            renderTestQuestion();
+        }
+
+        function suspendCurrentTestCard() {
+            if (!testState) return;
+            const actualIndex = testState.shuffledIndices[testState.currentIndex];
+            const C = payload.schema.lexiconCols;
+            const row = payload.items[actualIndex];
+            row[C.suspended] = true;
+
+            // Skip to next question
+            testState.currentIndex++;
+            renderTestQuestion();
+        }
+
+        function renderTestQuestion() {
+            // Stop any playing audio
+            const audio = _audioEl || initAudioElement();
+            if (audio && !audio.ended && !audio.paused) {
+                try {
+                    audio.pause();
+                    audio.currentTime = 0;
+                } catch (e) {
+                    log_('Failed to stop audio:', e);
+                }
+            }
+
+            if (!testState || testState.currentIndex >= testState.shuffledIndices.length) {
+                showTestResults();
+                return;
+            }
+
+            const actualIndex = testState.shuffledIndices[testState.currentIndex];
+            const row = payload.items[actualIndex];
+            const C = payload.schema.lexiconCols;
+
+            // Update progress - show number of questions answered so far
+            const sb = $('statusBarText');
+            const percentage = testState.currentIndex > 0 ? Math.round((testState.score / testState.currentIndex) * 100) : 0;
+            const deckName = testState.setName || '';
+            if (sb) {
+                if (deckName) {
+                    sb.innerHTML = `<span dir="auto">${deckName}</span><span dir="ltr"> - Questions: ${testState.currentIndex} · Score: ${percentage}%</span>`;
+                } else {
+                    sb.textContent = `Questions: ${testState.currentIndex} · Score: ${percentage}%`;
+                }
+            }
+
+            // Determine question mode based on QuizMode setting (same as Learn Mode)
+            const { effectiveMode, optionsBundle } = determineQuestionMode(actualIndex);
+            const isMCQ = (effectiveMode === 'MultipleChoice');
+
+            const term = String(row[C.term]);
+            const def = String(row[C.definition]);
+            const qEl = $('termText');
+            const answersEl = $('answers');
+            const termHeader = $('termHeader');
+            const suspendBtn = $('suspendBtn');
+
+            // Show suspend button in test mode
+            if (suspendBtn) {
+                suspendBtn.hidden = false;
+                suspendBtn.onclick = () => {
+                    showConfirm('Suspend this card? It will be hidden from study and tests.', () => {
+                        suspendCurrentTestCard();
+                    });
+                };
+            }
+
+            const isAudioOnly = payload?.setSettings?.AudioOnly === true || payload?.setSettings?.AudioOnly === 'true';
+            setupAudioForRow(row, isAudioOnly);
+            setupImageForRow(row, term);
+
+            setFeedback_('');
+            answersEl.innerHTML = '';
+            answersEl.classList.toggle('is-flash', !isMCQ);
+
+            if (isMCQ) {
+                // MCQ mode
+                termHeader?.removeAttribute('data-hide');
+                qEl.classList.add('autoshrink');
+                qEl.textContent = term;
+
+                if (optionsBundle.options.length === 0) {
+                    showError_('Cannot generate test question for this item');
+                    return;
+                }
+
+                answersEl.dataset.count = String(optionsBundle.options.length);
+                const correctIndex = optionsBundle.correctIndex;
+                for (let i = 0; i < optionsBundle.options.length; i++) {
+                    const btn = document.createElement('button');
+                    btn.className = 'answer';
+                    const span = document.createElement('span');
+                    span.className = 'answer-label';
+                    span.setAttribute('dir', 'auto');
+                    span.textContent = optionsBundle.options[i] || '';
+                    btn.appendChild(span);
+                    btn.onclick = () => onTestAnswer(i, correctIndex);
+                    answersEl.appendChild(btn);
+                }
+            } else {
+                // FlashCard mode
+                delete answersEl.dataset.count;
+                termHeader?.removeAttribute('data-hide');
+                qEl.classList.add('autoshrink');
+                qEl.textContent = term;
+                renderFlashCard(term, def);
+
+                // Update flash card buttons to use onTestAnswer
+                const okBtn = document.querySelector('.fc-btn.correct');
+                const noBtn = document.querySelector('.fc-btn.wrong');
+                if (okBtn && noBtn) {
+                    const FLASH_CORRECT = 0;
+                    okBtn.onclick = () => onTestAnswer(FLASH_CORRECT, FLASH_CORRECT);
+                    noBtn.onclick = () => onTestAnswer(-1, FLASH_CORRECT);
+                }
+            }
+
+            setTimeout(autoshrinkAll, 0);
+        }
+
+        function onTestAnswer(chosenIndex, correctIndex) {
+            const isCorrect = chosenIndex === correctIndex;
+            if (isCorrect) testState.score++;
+
+            // Update status bar immediately after answer
+            testState.currentIndex++;
+            const sb = $('statusBarText');
+            const percentage = Math.round((testState.score / testState.currentIndex) * 100);
+            const deckName = testState.setName || '';
+            if (sb) {
+                if (deckName) {
+                    sb.innerHTML = `<span dir="auto">${deckName}</span><span dir="ltr"> - Questions: ${testState.currentIndex} · Score: ${percentage}%</span>`;
+                } else {
+                    sb.textContent = `Questions: ${testState.currentIndex} · Score: ${percentage}%`;
+                }
+            }
+
+            // Show feedback
+            const btns = Array.from(document.querySelectorAll('.answer'));
+            btns.forEach(b => {
+                b.disabled = true;
+                b.classList.remove('correct', 'wrong', 'selected-wrong');
+            });
+
+            if (isCorrect) {
+                setFeedback_('<span class="success">✓ Correct</span>');
+                if (btns[correctIndex]) btns[correctIndex].classList.add('correct');
+            } else {
+                setFeedback_('<span class="error">✗ Incorrect. Tap/click anywhere or press any key to continue</span>');
+                if (chosenIndex >= 0 && btns[chosenIndex]) btns[chosenIndex].classList.add('wrong', 'selected-wrong');
+                if (btns[correctIndex]) btns[correctIndex].classList.add('correct');
+            }
+
+            // Auto-save every 10 questions (background)
+            if (testState.currentIndex % 10 === 0) {
+                saveTestProgress().catch(e => log_('Background test save failed:', e));
+            }
+
+            // Continue with same pattern as learn mode
+            let continueTimer = null;
+            const done = () => {
+                if (continueTimer) {
+                    clearTimeout(continueTimer);
+                    continueTimer = null;
+                }
+                document.removeEventListener('keydown', onKey, true);
+                document.removeEventListener('click', onClick, true);
+                renderTestQuestion();
+            };
+            const onKey = (e) => done();
+            const onClick = (e) => done();
+            document.addEventListener('keydown', onKey, true);
+            document.addEventListener('click', onClick, true);
+            if (isCorrect) {
+                continueTimer = setTimeout(done, 400);
+            }
+        }
+
+        async function saveTestProgress() {
+            const d = testState.startTime;
+            const testDateTime = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+            const questionsAnswered = testState.currentIndex;
+            const percentage = Math.round((testState.score / questionsAnswered) * 100);
+            const testSessionId = testState.sessionId;
+
+            SaveQueue.add('testResult', {
+                saveType: 'testResult',
+                testData: {
+                    testDateTime,
+                    setName: testState.setName,
+                    questionsAnswered,
+                    percentage,
+                    testSessionId
+                }
+            });
+        }
+
+        async function exitTestMode() {
+            if (testState && testState.currentIndex > 0) {
+                await saveTestProgress().catch(e => log_('Test save failed:', e));
+                const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
+                const userProgress = payload.items.map(row => row.slice(cardWidth));
+                await service.saveSession({
+                    userId: currentCredentials.email,
+                    password: currentCredentials.password,
+                    activeSet: payload.activeSet,
+                    saveType: 'progress',
+                    data: userProgress
+                }).catch(e => log_('Progress save failed:', e));
+            }
+            testState = null;
+
+            // Update menu item
+            const label = $('testModeLabel');
+            const icon = $('testModeIcon');
+            if (label) label.textContent = 'Test Mode';
+            if (icon) icon.textContent = '🧪';
+
+            // Reset UI state
+            $('quizArea').classList.remove('hidden');
+            $('doneArea').classList.add('hidden');
+
+            // Reset payload state
+            if (payload && payload.state) {
+                payload.state.currentIndex = -1;
+            }
+
+            goNext();
+        }
+
+        function showTestResults() {
+            const percentage = Math.round((testState.score / testState.totalQuestions) * 100);
+
+            $('quizArea').classList.add('hidden');
+            $('doneArea').classList.remove('hidden');
+
+            $('scoreText').textContent = `${testState.score}/${testState.totalQuestions} (${percentage}%)`;
+            const el = $('statusBarText');
+            if (el) el.textContent = 'Test Complete';
+
+            // Hide the "study more" prompt in test mode
+            const extraPrompt = $('extraNewPrompt');
+            if (extraPrompt) extraPrompt.style.display = 'none';
+
+            // Save in background
+            saveTestProgress().catch(e => log_('Background test save failed:', e));
+            const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
+            const userProgress = payload.items.map(row => row.slice(cardWidth));
+            service.saveSession({
+                userId: currentCredentials.email,
+                password: currentCredentials.password,
+                saveType: 'progress',
+                data: userProgress
+            }).catch(e => log_('Background progress save failed:', e));
+
+            testState = null;
+        }
+
+        async function loadSession() {
+            log_('[loadSession] START email=' + currentCredentials.email);
+            const sessionArg = {
+                userId: currentCredentials.email,
+                password: currentCredentials.password,
+                setName: currentCredentials.setName || null
+            };
+            const sess = await service.getSession(sessionArg);
+            log_('[loadSession] Received session success=' + sess.success);
+
+            if (sess.success === false) {
+                if (sess.error === 'WRONG_PASSWORD' || sess.error === 'USER_NOT_FOUND') {
+                    clearCredentials();
+                    showLoginModal();
+                    throw new Error(sess.error);
+                }
+                // Handle other errors (sheet parsing, missing metadata, etc.)
+                throw new Error(sess.error || 'Failed to load session');
+            }
+
+            return sess;
+        }
+
+        function setupUserDisplay(sess) {
+            const userIdEl = $('userIdDisplay');
+            if (userIdEl && sess.userId) {
+                userIdEl.textContent = sess.userId;
+            }
+        }
+
+        function populateStudySetMenu(sess) {
+            const studySetList = $('studySetList');
+            if (!studySetList || !Array.isArray(sess.availableSets)) return;
+
+            studySetList.innerHTML = '';
+
+            if (sess.availableSets.length === 0) {
+                const msg = document.createElement('div');
+                msg.style.padding = '12px';
+                msg.style.color = '#666';
+                msg.style.fontSize = '14px';
+                msg.textContent = `Contact admin (${sess.adminEmail || 'administrator'}) to enable study sets`;
+                studySetList.appendChild(msg);
+                return;
+            }
+
+            sess.availableSets.forEach(setName => {
+                const item = document.createElement('div');
+                item.className = 'submenu-item';
+                if (setName === sess.activeSet) item.classList.add('active');
+
+                const label = document.createElement('span');
+                label.textContent = setName;
+                item.appendChild(label);
+
+                if (setName === sess.activeSet) {
+                    const check = document.createElement('span');
+                    check.className = 'submenu-check';
+                    check.textContent = '✓';
+                    item.appendChild(check);
+                }
+
+                item.onclick = async () => {
+                    if (setName === sess.activeSet) return;
+                    if (menuDropdown) menuDropdown.hidden = true;
+                    if (studySetSubmenu) studySetSubmenu.hidden = true;
+
+                    const sb = $('statusBarText');
+                    if (sb) sb.textContent = 'Switching set...';
+
+                    // Save progress if needed
+                    const saves = [];
+                    if (testState && testState.currentIndex > 0) saves.push(saveTestProgress());
+                    if (payload && payload.state && payload.state.answeredCount > 0) {
+                        const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
+                        const userProgress = payload.items.map(row => row.slice(cardWidth));
+                        saves.push(service.saveSession({
+                            userId: currentCredentials.email,
+                            password: currentCredentials.password,
+                            activeSet: payload.activeSet,
+                            saveType: 'progress',
+                            data: userProgress
+                        }));
+                    }
+                    if (saves.length) await Promise.allSettled(saves);
+
+                    // Reset state before loading new set
+                    testState = null;
+                    payload = null;
+                    settings = [];
+                    _lastSavedAnswerCount = 0;
+
+                    // DON'T clear cache - keep all decks cached for instant switching
+
+                    // Load new set
+                    try {
+                        saveCredentials(currentCredentials.email, currentCredentials.password, setName);
+                        await boot();
+                    } catch (err) {
+                        showError_('Failed to switch set: ' + err);
+                    }
+                };
+
+                studySetList.appendChild(item);
+            });
+        }
+
+        function handleNoActiveSet(sess) {
+            const sb = $('statusBarText');
+
+            if (!sess.availableSets || sess.availableSets.length === 0) {
+                if (sb) {
+                    const adminEmail = sess.adminEmail || 'administrator';
+                    sb.textContent = `Contact admin (${adminEmail}) to enable study sets`;
+                }
+            } else {
+                if (sb) {
+                    sb.textContent = 'Choose a study set from the menu (☰) to begin';
+                }
+            }
+
+            $('quizArea').classList.add('hidden');
+            $('doneArea').classList.add('hidden');
+
+            const hasAvailableSets = sess.availableSets && sess.availableSets.length > 0;
+            const studySetItem = $('studySetMenuItem');
+            if (studySetItem) {
+                if (hasAvailableSets) {
+                    studySetItem.style.opacity = '';
+                    studySetItem.style.pointerEvents = '';
+                } else {
+                    studySetItem.style.opacity = '0.5';
+                    studySetItem.style.pointerEvents = 'none';
+                }
+            }
+
+            ['testModeMenuItem', 'suspendMenuItem', 'settingsMenuItem'].forEach(id => {
+                const el = $(id);
+                if (el) {
+                    el.style.opacity = '0.5';
+                    el.style.pointerEvents = 'none';
+                }
+            });
+        }
+
+        function enableMenuItems(sess) {
+            const hasAvailableSets = sess.availableSets && sess.availableSets.length > 0;
+            const hasActiveSet = !!sess.activeSet;
+
+            const studySetItem = $('studySetMenuItem');
+            if (studySetItem) {
+                if (hasAvailableSets) {
+                    studySetItem.style.opacity = '';
+                    studySetItem.style.pointerEvents = '';
+                } else {
+                    studySetItem.style.opacity = '0.5';
+                    studySetItem.style.pointerEvents = 'none';
+                }
+            }
+
+            ['testModeMenuItem', 'suspendMenuItem', 'settingsMenuItem'].forEach(id => {
+                const el = $(id);
+                if (el) {
+                    if (hasActiveSet) {
+                        el.style.opacity = '';
+                        el.style.pointerEvents = '';
+                    } else {
+                        el.style.opacity = '0.5';
+                        el.style.pointerEvents = 'none';
+                    }
+                }
+            });
+        }
+
+        function buildPayload(sess) {
+            log_('[buildPayload] Building payload from session');
+            log_('[buildPayload] Received userSettings:', JSON.stringify(sess.userSettings));
+            log_('[buildPayload] userSettings length:', sess.userSettings?.length);
+            const items = sess.cards.map((cardRow, idx) => {
+                const progressRow = sess.userProgress[idx] || [];
+                return [...cardRow, ...progressRow];
+            });
+            log_('[buildPayload] Built ' + items.length + ' items');
+
+            const schema = !IS_MOCK
+                ? (sess.studySetSchema && sess.userProgressSchema
+                    ? { lexiconCols: buildLexiconSchema(sess.studySetSchema, sess.userProgressSchema) }
+                    : (() => { throw new Error('Missing server schema'); })())
+                : { lexiconCols: buildLexiconSchema(STUDY_SET_SCHEMA, USER_PROGRESS_SCHEMA) };
+
+            return {
+                items: items.map(r => Array.isArray(r) ? r.slice() : []),
+                settings: (sess.userSettings || []).map(r => Array.isArray(r) ? r.slice() : []),
+                setSettings: sess.setSettings || {},
+                activeSet: sess.activeSet || '',
+                availableSets: sess.availableSets || [],
+                adminEmail: sess.adminEmail || 'administrator',
+                schema,
+                state: {
+                    currentIndex: -1,
+                    answeredCount: 0,
+                    servedNewToday: 0,
+                    extraNewItems: 0,
+                    sessionStatusText: '',
+                    _armed: false
+                },
+                _isMock: IS_MOCK
+            };
+        }
+
+        // IndexedDB cache wrapper
+        const DeckCache = {
+            dbName: 'fsrs_decks',
+            storeName: 'sessions',
+            db: null,
+
+            async init() {
+                if (this.db) return this.db;
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(this.dbName, 1);
+                    request.onerror = () => reject(request.error);
+                    request.onsuccess = () => {
+                        this.db = request.result;
+                        resolve(this.db);
+                    };
+                    request.onupgradeneeded = (e) => {
+                        const db = e.target.result;
+                        if (!db.objectStoreNames.contains(this.storeName)) {
+                            db.createObjectStore(this.storeName);
+                        }
+                    };
+                });
+            },
+
+            async get(key) {
+                try {
+                    await this.init();
+                    return new Promise((resolve, reject) => {
+                        const tx = this.db.transaction(this.storeName, 'readonly');
+                        const store = tx.objectStore(this.storeName);
+                        const request = store.get(key);
+                        request.onsuccess = () => resolve(request.result);
+                        request.onerror = () => reject(request.error);
+                    });
+                } catch (e) {
+                    log_('[DeckCache] get failed:', e);
+                    return null;
+                }
+            },
+
+            async set(key, value) {
+                try {
+                    await this.init();
+                    return new Promise((resolve, reject) => {
+                        const tx = this.db.transaction(this.storeName, 'readwrite');
+                        const store = tx.objectStore(this.storeName);
+                        const request = store.put(value, key);
+                        request.onsuccess = () => resolve();
+                        request.onerror = () => reject(request.error);
+                    });
+                } catch (e) {
+                    log_('[DeckCache] set failed:', e);
+                }
+            }
+        };
+
+        async function boot(cachedSession = null) {
+            const t0 = performance.now();
+            log_('[boot] START');
+
+            if (!currentCredentials || !currentCredentials.email || !currentCredentials.password) {
+                log_('[boot] No credentials, showing login');
+                showLoginModal();
+                return;
+            }
+            log_('[boot] Has credentials, loading session');
+
+            const sb = $('statusBarText');
+            if (sb) sb.textContent = 'Loading...';
+
+            // Try IndexedDB cache first
+            const cacheKey = `${currentCredentials.email}_${currentCredentials.setName || 'default'}`;
+            let cachedSess = null;
+
+            if (!cachedSession) {
+                try {
+                    cachedSess = await DeckCache.get(cacheKey);
+                    if (cachedSess) {
+                        log_('[boot] Found cached session in IndexedDB, using immediately');
+                        if (sb) sb.textContent = 'Loading cached data...';
+                    }
+                } catch (e) {
+                    log_('[boot] Cache read failed:', e);
+                }
+            }
+
+            try {
+                // If we have cached data, show it immediately
+                if (cachedSess) {
+                    const sess = cachedSess;
+                    setupUserDisplay(sess);
+                    populateStudySetMenu(sess);
+
+                    if (!sess.activeSet) {
+                        handleNoActiveSet(sess);
+                        return;
+                    }
+
+                    enableMenuItems(sess);
+
+                    if (!Array.isArray(sess.cards) || !Array.isArray(sess.userProgress)) {
+                        throw new Error('Cached session is invalid');
+                    }
+
+                    payload = buildPayload(sess);
+                    settings = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
+                    renderSettingsUI({ settings });
+                    applyTheme();
+                    autoAdjustNewItemsPerDay();
+
+                    $('quizArea').classList.remove('hidden');
+                    $('doneArea').classList.add('hidden');
+                    initAudioStateFromSettings();
+
+                    log_('[boot] Cached data displayed, fetching fresh in background');
+                    if (sb) sb.textContent = 'Syncing...';
+                    goNext();
+                }
+
+                // Always fetch fresh data in background
+                const sess = cachedSession || (log_('boot: calling service.getSession()'), await loadSession());
+
+                // Display retry info if present
+                if (sess.retryInfo) {
+                    log_('[boot] ' + sess.retryInfo);
+                }
+                if (frontendRetryCount > 0) {
+                    log_(`[boot] Frontend retried ${frontendRetryCount} request(s)`);
+                    frontendRetryCount = 0;
+                }
+
+                // Update cache with fresh data (IndexedDB)
+                DeckCache.set(cacheKey, sess).catch(e => log_('[boot] Cache write failed:', e));
+                log_('[boot] Cache updated with fresh data');
+
+                // If we already showed cached data, check if anything changed
+                if (cachedSess) {
+                    const progressChanged = JSON.stringify(cachedSess.userProgress) !== JSON.stringify(sess.userProgress);
+                    const settingsChanged = JSON.stringify(cachedSess.userSettings) !== JSON.stringify(sess.userSettings);
+                    if (progressChanged || settingsChanged) {
+                        log_('[boot] Data changed (progress=' + progressChanged + ', settings=' + settingsChanged + '), updating UI');
+                        if (sb) sb.textContent = 'Updated from server';
+
+                        // Rebuild payload with fresh data
+                        payload = buildPayload(sess);
+                        settings = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
+                        renderSettingsUI({ settings });
+                        applyTheme();
+                        autoAdjustNewItemsPerDay();
+
+                        // Reset to first card with fresh data
+                        payload.state.currentIndex = -1;
+                        goNext();
+                    } else {
+                        log_('[boot] No changes detected');
+                        if (sb) updateSessionStats();
+                    }
+                    return;
+                }
+
+                // No cached data - show fresh data normally
+                setupUserDisplay(sess);
+                populateStudySetMenu(sess);
+
+                if (!sess.activeSet) {
+                    handleNoActiveSet(sess);
+                    return;
+                }
+
+                enableMenuItems(sess);
+
+                if (!Array.isArray(sess.cards) || !Array.isArray(sess.userProgress)) {
+                    log_('Session validation failed:', sess);
+                    throw new Error('Session is missing cards/userProgress');
+                }
+
+                payload = buildPayload(sess);
+                log_('[boot] Payload built, items=' + payload.items.length);
+                log_('[boot] Payload.settings:', JSON.stringify(payload.settings));
+
+                // Active settings (editable copy for this run)
+                settings = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
+                log_('[boot] Active settings copied, length=' + settings.length);
+                log_('[boot] Active settings:', JSON.stringify(settings));
+                renderSettingsUI({ settings });
+                applyTheme();
+                autoAdjustNewItemsPerDay();
+                log_('[boot] UI initialized');
+
+                // UI show
+                $('quizArea').classList.remove('hidden');
+                $('doneArea').classList.add('hidden');
+
+                // Autoplay arming (once)
+                initAudioStateFromSettings();
+                log_('[boot] SUCCESS ' + Math.round(performance.now() - t0) + 'ms');
+                if (!cachedSess) goNext();
+            } catch (err) {
+                log_('boot: caught error', err);
+                log_('boot: error stack', err.stack);
+                if (!IS_MOCK) {
+                    showError_('Failed to load session from server: ' + (err.message || String(err)));
+                    return;
+                }
+                // Mock fallback
+                payload = {
+                    items: MOCK_ITEMS.map(r => r.slice()),
+                    settings: MOCK_USER_SETTINGS.map(r => Array.isArray(r) ? r.slice() : []),
+                    setSettings: MOCK_SET_SETTINGS,
+                    activeSet: 'TestSet',
+                    schema: { lexiconCols: buildLexiconSchema(STUDY_SET_SCHEMA, USER_PROGRESS_SCHEMA) },
+                    state: {
+                        currentIndex: -1,
+                        answeredCount: 0,
+                        servedNewToday: 0,
+                        extraNewItems: 0,
+                        sessionStatusText: '',
+                        _armed: false
+                    },
+                    _isMock: true
+                };
+                settings = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
+                renderSettingsUI({ settings });
+                applyTheme();
+                $('quizArea').classList.remove('hidden');
+                $('doneArea').classList.add('hidden');
+                initAudioStateFromSettings();
+                log_(`[FRONT] boot(mock) ${Math.round(performance.now() - t0)}ms`);
+                goNext();
+            }
+        }
+
+        function decideNextIndex() {
+            log_('[decideNextIndex] Finding next card');
+            const C = payload.schema.lexiconCols;
+            const baseNewLimit = getSetting('NewItemsPerDay', true);
+            const extraNew = Number(payload?.state?.extraNewItems || 0);
+            const limitNew = baseNewLimit + (Number.isFinite(extraNew) ? extraNew : 0);
+            const now = Date.now();
+            const items = payload.items;
+            log_('[decideNextIndex] limitNew=' + limitNew + ' servedNew=' + payload.state.servedNewToday);
+
+            for (let i = 0; i < items.length; i++) {
+                const row = items[i];
+                if (!row) continue;
+                const suspended = !!row[C.suspended];
+                const reps = Number(row[C.reps] || 0);
+                const step = Number(row[C.step] || 0);
+                const due = parseDue_(row[C.due]);
+                const isNew = (reps === 0 && step === 0 && !(due instanceof Date));
+                if (!suspended && isNew && payload.state.servedNewToday < limitNew) {
+                    log_('[decideNextIndex] Found new card at index ' + i);
+                    return i;
+                }
+            }
+
+            let earliestDueIndex = -1;
+            let earliestDueTime = Number.POSITIVE_INFINITY;
+            for (let i = 0; i < items.length; i++) {
+                const row = items[i];
+                if (!row) continue;
+                const suspended = !!row[C.suspended];
+                if (suspended) continue;
+                const due = parseDue_(row[C.due]);
+                if (!(due instanceof Date)) continue;
+                const dueMs = due.getTime();
+                if ((dueMs - MIN_REVIEW_INTERVAL_MS) <= now && dueMs < earliestDueTime) {
+                    earliestDueTime = dueMs;
+                    earliestDueIndex = i;
+                }
+            }
+            log_('[decideNextIndex] Result index=' + earliestDueIndex);
+            return earliestDueIndex;
+        }
+
+        function getDistractorColumnIndices() {
+            const schema = payload?.schema?.lexiconCols || buildLexiconSchema(STUDY_SET_SCHEMA, USER_PROGRESS_SCHEMA);
+            return DISTRACTOR_KEYS
+                .map(key => schema[key])
+                .filter(idx => Number.isFinite(idx));
+        }
+
+        function computeOptionsForRow(rowIndex) {
+            const distractorIndices = getDistractorColumnIndices();
+            const totalDistractors = distractorIndices.length;
+            if (!totalDistractors) return { options: [], correctIndex: null };
+            const C = payload.schema.lexiconCols || buildLexiconSchema(STUDY_SET_SCHEMA, USER_PROGRESS_SCHEMA);
+            const defCol = C.definition;
+            const row = payload.items[rowIndex] || [];
+            const correctText = String(row[defCol] ?? '').trim();
+            if (!correctText) return { options: [], correctIndex: null };
+
+            const useReferences = (() => {
+                try {
+                    const setSettings = payload?.setSettings || MOCK_SET_SETTINGS || {};
+                    const val = setSettings.DistractorsAsReference;
+                    return val === true || val === 'true' || val === 'TRUE';
+                } catch (e) {
+                    return false;
+                }
+            })();
+
+            if (useReferences) {
+                const dataStartRow = Number(payload?.setSettings?.DATA_START_ROW) || 1;
+                const distRows = distractorIndices.map(idx => {
+                    const ref = Number(row[idx]);
+                    if (!Number.isFinite(ref) || ref < dataStartRow) return -1;
+                    return ref - dataStartRow;
+                }).filter(i => i >= 0 && i < payload.items.length && i !== rowIndex);
+                const required = totalDistractors;
+                const chosen = [];
+                const seenDefs = new Set();
+                seenDefs.add(correctText.toLowerCase());
+                for (let i = 0; i < distRows.length && chosen.length < required; i++) {
+                    const candRow = payload.items[distRows[i]] || [];
+                    const candText = String(candRow[defCol] ?? '').trim();
+                    if (!candText) continue;
+                    if (seenDefs.has(candText.toLowerCase())) continue;
+                    seenDefs.add(candText.toLowerCase());
+                    chosen.push(candText);
+                }
+                if (chosen.length < required) {
+                    return { options: [], correctIndex: null };
+                }
+                const options = [correctText, ...chosen].map(text => ({ text }));
+                const enumerated = options.map((opt, idx) => ({ ...opt, originalIndex: idx }));
+                const shuffled = enumerated.sort(() => Math.random() - 0.5);
+                const correctIndex = shuffled.findIndex(opt => opt.originalIndex === 0);
+                return {
+                    options: shuffled.map(opt => opt.text),
+                    correctIndex
+                };
+            }
+
+            // Non-reference mode: read literal text from distractor columns
+            const texts = [];
+            for (const idx of distractorIndices) {
+                const value = String(row[idx] ?? '').trim();
+                if (!value) return { options: [], correctIndex: null };
+                texts.push(value);
+            }
+            // Correct answer is always definition column, distractors are literal text
+            const options = [correctText, ...texts].map(text => ({ text }));
+            const enumerated = options.map((opt, idx) => ({ ...opt, originalIndex: idx }));
+            const shuffled = enumerated.sort(() => Math.random() - 0.5);
+            const correctIndex = shuffled.findIndex(opt => opt.originalIndex === 0);
+            return {
+                options: shuffled.map(opt => opt.text),
+                correctIndex
+            };
+        }
+
+        function suspendCurrentCard() {
+            const C = payload.schema.lexiconCols;
+            const currentIndex = payload.state.currentIndex;
+            if (currentIndex < 0 || currentIndex >= payload.items.length) return;
+
+            const row = payload.items[currentIndex];
+            row[C.suspended] = true;
+
+            // In study mode, autosave will handle persistence
+            // Skip to next card immediately
+            goNext();
+        }
+
+        function populateSuspendBands() {
+            if (!payload || !payload.items) return;
+
+            const C = payload.schema.lexiconCols;
+            const bandList = $('suspendBandList');
+            if (!bandList) return;
+
+            // Collect unique bands
+            const bandCounts = {};
+            for (const row of payload.items) {
+                const band = String(row[C.band] || '').trim() || 'No Band';
+                bandCounts[band] = (bandCounts[band] || 0) + 1;
+            }
+
+            const bands = Object.keys(bandCounts).sort();
+            bandList.innerHTML = '';
+
+            // If only one band or no bands, open directly
+            if (bands.length <= 1) {
+                openSuspendModal(null);
+                return;
+            }
+
+            // Create submenu items for each band
+            bands.forEach(band => {
+                const item = document.createElement('div');
+                item.className = 'submenu-item';
+                item.textContent = `${band} (${bandCounts[band]})`;
+                item.onclick = () => {
+                    if (menuDropdown) menuDropdown.hidden = true;
+                    if (suspendSubmenu) suspendSubmenu.hidden = true;
+                    openSuspendModal(band === 'No Band' ? '' : band);
+                };
+                bandList.appendChild(item);
+            });
+
+            // Add "All Cards" option
+            const allItem = document.createElement('div');
+            allItem.className = 'submenu-item';
+            allItem.textContent = `All Cards (${payload.items.length})`;
+            allItem.onclick = () => {
+                if (menuDropdown) menuDropdown.hidden = true;
+                if (suspendSubmenu) suspendSubmenu.hidden = true;
+                openSuspendModal(null);
+            };
+            bandList.appendChild(allItem);
+        }
+
+        function openSuspendModal(bandFilter) {
+            if (!payload || !payload.items) return;
+
+            const C = payload.schema.lexiconCols;
+            const modal = $('suspendModal');
+            const title = $('suspendModalTitle');
+            const cardList = $('suspendCardList');
+            const searchInput = $('suspendSearch');
+
+            if (!modal || !cardList) return;
+
+            if (title) {
+                title.textContent = bandFilter ? `Suspend Cards - ${bandFilter}` : 'Suspend Cards - All';
+            }
+
+            const filteredCards = [];
+            for (let i = 0; i < payload.items.length; i++) {
+                const row = payload.items[i];
+                const band = String(row[C.band] || '').trim();
+                if (bandFilter === null || band === bandFilter) {
+                    filteredCards.push({ index: i, row });
+                }
+            }
+
+            const renderCardList = (searchTerm = '') => {
+                cardList.innerHTML = '';
+                const term = searchTerm.toLowerCase();
+
+                const highlight = (text) => {
+                    if (!term) return text;
+                    const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+                    return text.replace(regex, '<mark style="background: #ffeb3b; padding: 0 2px;">$1</mark>');
+                };
+
+                filteredCards.forEach(({ index, row }) => {
+                    const cardTerm = String(row[C.term] || '').trim();
+                    const cardDef = String(row[C.definition] || '').trim();
+                    const combined = `${cardTerm} ${cardDef}`.toLowerCase();
+
+                    if (term && !combined.includes(term)) return;
+
+                    const isSuspended = !!row[C.suspended];
+
+                    const item = document.createElement('div');
+                    item.style.display = 'grid';
+                    item.style.gridTemplateColumns = 'auto 1fr 1fr';
+                    item.style.gap = '12px';
+                    item.style.padding = '8px';
+                    item.style.borderBottom = '1px solid #eee';
+                    item.style.alignItems = 'center';
+
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.checked = isSuspended;
+                    checkbox.dataset.index = index;
+                    checkbox.style.cursor = 'pointer';
+
+                    const termSpan = document.createElement('span');
+                    termSpan.innerHTML = highlight(cardTerm);
+                    termSpan.setAttribute('dir', 'auto');
+                    if (isSuspended) {
+                        termSpan.style.textDecoration = 'line-through';
+                        termSpan.style.opacity = '0.5';
+                    }
+
+                    const defSpan = document.createElement('span');
+                    defSpan.innerHTML = highlight(cardDef);
+                    defSpan.setAttribute('dir', 'auto');
+                    if (isSuspended) {
+                        defSpan.style.textDecoration = 'line-through';
+                        defSpan.style.opacity = '0.5';
+                    }
+
+                    checkbox.onchange = () => {
+                        const isChecked = checkbox.checked;
+                        termSpan.style.textDecoration = isChecked ? 'line-through' : 'none';
+                        termSpan.style.opacity = isChecked ? '0.5' : '1';
+                        defSpan.style.textDecoration = isChecked ? 'line-through' : 'none';
+                        defSpan.style.opacity = isChecked ? '0.5' : '1';
+                    }
+
+                    item.appendChild(checkbox);
+                    item.appendChild(termSpan);
+                    item.appendChild(defSpan);
+                    cardList.appendChild(item);
+                });
+            };
+
+            renderCardList();
+
+            if (searchInput) {
+                searchInput.value = '';
+                searchInput.oninput = () => renderCardList(searchInput.value);
+            }
+
+            modal.hidden = false;
+        }
+
+        function stopAudio() {
+            _audioRequestId++;
+            const audio = _audioEl || initAudioElement();
+            try {
+                audio.pause();
+                audio.currentTime = 0;
+            } catch (e) { }
+        }
+
+        function determineQuestionMode(currentIndex) {
+            const expectedDistractors = getDistractorColumnIndices().length;
+            let preferMCQ = false;
+            try {
+                const val = getSetting('QuizMode');
+                preferMCQ = (val === true || val === 'true');
+            } catch (e) {
+                preferMCQ = true;
+            }
+            let effectiveMode = preferMCQ ? 'MultipleChoice' : 'FlashCard';
+            let optionsBundle = { options: [], correctIndex: null };
+
+            if (effectiveMode === 'MultipleChoice') {
+                optionsBundle = computeOptionsForRow(currentIndex);
+                const expectedOptions = expectedDistractors + 1; // distractors + correct answer
+                if (!expectedDistractors || optionsBundle.options.length < expectedOptions || optionsBundle.correctIndex === null) {
+                    effectiveMode = 'FlashCard';
+                    optionsBundle = { options: [], correctIndex: null };
+                }
+            }
+            return { effectiveMode, optionsBundle };
+        }
+
+        function setupAudioForRow(row, isAudioOnly) {
+            try {
+                _currentAudioUrl = resolveAudioUrlForRow(row);
+                const hasAudio = !!_currentAudioUrl;
+                const audioBtn = $('audioBtn');
+                const qEl = $('termText');
+
+                if (audioBtn) audioBtn.classList.remove('audio-only-mode');
+
+                if (isAudioOnly && hasAudio) {
+                    if (qEl) qEl.style.display = 'none';
+                    if (audioBtn) audioBtn.classList.add('audio-only-mode');
+                    _audioEnabled = true;
+                    log_('[Audio] AudioOnly mode, URL:', _currentAudioUrl);
+                } else {
+                    if (qEl) qEl.style.display = '';
+                }
+
+                updateAudioUIForCurrentRow(hasAudio);
+
+                if (hasAudio && _audioEnabled) {
+                    log_('[Audio] Auto-playing...');
+                    playAudioUrl(_currentAudioUrl).then(success => {
+                        log_('[Audio] Auto-play result:', success);
+                    });
+                }
+            } catch (e) {
+                log_('[Audio] Setup error:', e);
+                const audioBtn = $('audioBtn');
+                if (audioBtn) { audioBtn.hidden = false; audioBtn.disabled = true; }
+            }
+        }
+
+        function setupImageForRow(row, term) {
+            const C = payload.schema.lexiconCols;
+            const imageWrap = $('termImageWrap');
+            const imageEl = $('termImage');
+            const imageUrl = String(row[C.image] ?? '').trim();
+            if (imageEl && imageUrl) {
+                imageWrap?.classList.remove('active');
+                imageEl.onload = () => {
+                    imageWrap?.classList.add('active');
+                    autoshrinkAll();
+                };
+                imageEl.onerror = () => autoshrinkAll();
+                imageEl.src = imageUrl;
+                imageEl.alt = term;
+            } else {
+                if (imageEl) imageEl.removeAttribute('src');
+                imageWrap?.classList.remove('active');
+            }
+        }
+
+        function renderMCQOptions(optionsBundle) {
+            const answersEl = $('answers');
+            const options = optionsBundle.options;
+            answersEl.dataset.count = String(options.length || 0);
+            const correctIndex = optionsBundle.correctIndex ?? -1;
+            for (let i = 0; i < options.length; i++) {
+                const btn = document.createElement('button');
+                btn.className = 'answer';
+                const span = document.createElement('span');
+                span.className = 'answer-label';
+                span.setAttribute('dir', 'auto');
+                span.textContent = options[i] || '';
+                btn.appendChild(span);
+                btn.onclick = () => onAnswer(i, correctIndex);
+                answersEl.appendChild(btn);
+            }
+        }
+
+        function renderFlashCard(term, def) {
+            const answersEl = $('answers');
+            const wrap = document.createElement('div');
+            wrap.className = 'flash-wrap';
+            const card = document.createElement('div');
+            card.className = 'flip-card';
+            const inner = document.createElement('div');
+            inner.className = 'flip-inner';
+            const front = document.createElement('div');
+            front.className = 'flip-face flip-front';
+            front.setAttribute('dir', 'auto');
+            front.textContent = term;
+            const back = document.createElement('div');
+            back.className = 'flip-face flip-back';
+            back.setAttribute('dir', 'auto');
+            back.textContent = def;
+            inner.appendChild(front);
+            inner.appendChild(back);
+            card.appendChild(inner);
+            wrap.appendChild(card);
+
+            const controls = document.createElement('div');
+            controls.className = 'flash-controls';
+            controls.hidden = true;
+
+            const okBtn = document.createElement('button');
+            okBtn.type = 'button';
+            okBtn.className = 'fc-btn correct';
+            okBtn.textContent = '✓ Correct';
+            okBtn.disabled = true;
+
+            const noBtn = document.createElement('button');
+            noBtn.type = 'button';
+            noBtn.className = 'fc-btn wrong';
+            noBtn.textContent = '✗ Wrong';
+            noBtn.disabled = true;
+
+            const FLASH_CORRECT = 0;
+            okBtn.addEventListener('click', () => onAnswer(FLASH_CORRECT, FLASH_CORRECT));
+            noBtn.addEventListener('click', () => onAnswer(-1, FLASH_CORRECT));
+
+            controls.appendChild(okBtn);
+            controls.appendChild(noBtn);
+
+            answersEl.appendChild(wrap);
+            answersEl.appendChild(controls);
+
+            let firstRevealDone = false;
+            const onFlip = () => {
+                const wasFlipped = card.classList.contains('is-flipped');
+                card.classList.toggle('is-flipped');
+
+                if (!wasFlipped && !firstRevealDone) {
+                    controls.hidden = false;
+                    okBtn.disabled = false;
+                    noBtn.disabled = false;
+                    firstRevealDone = true;
+                }
+            };
+            card.addEventListener('click', onFlip);
+            setTimeout(() => autoshrinkAll(), 0);
+        }
+
+        function renderTerm() {
+            stopAudio();
+
+            const C = payload.schema.lexiconCols;
+            const currentIndex = payload.state.currentIndex;
+            const row = payload.items[currentIndex];
+
+            const isAudioOnly = payload?.setSettings?.AudioOnly === true || payload?.setSettings?.AudioOnly === 'true';
+            const term = String(row[C.term]);
+            const def = String(row[C.definition]);
+
+            const { effectiveMode, optionsBundle } = determineQuestionMode(currentIndex);
+
+            const isMCQ = (effectiveMode === 'MultipleChoice');
+            const termHeader = $('termHeader');
+            const qEl = $('termText');
+            const suspendBtn = $('suspendBtn');
+            const answersEl = $('answers');
+
+            if (suspendBtn) {
+                suspendBtn.hidden = false;
+                suspendBtn.onclick = () => {
+                    showConfirm('Suspend this card? It will be hidden from study and tests.', () => {
+                        if (wasNewBeforeAnswer && payload.state.servedNewToday > 0) {
+                            payload.state.servedNewToday--;
+                        }
+                        wasNewBeforeAnswer = false;
+                        suspendCurrentCard();
+                    });
+                };
+            }
+
+            setupAudioForRow(row, isAudioOnly);
+            setupImageForRow(row, term);
+
+            setFeedback_('');
+            answersEl.innerHTML = '';
+            answersEl.classList.toggle('is-flash', !isMCQ);
+
+            if (isMCQ) {
+                termHeader?.removeAttribute('data-hide');
+                qEl.classList.add('autoshrink');
+                qEl.textContent = term;
+                renderMCQOptions(optionsBundle);
+            } else {
+                delete answersEl.dataset.count;
+                termHeader?.removeAttribute('data-hide');
+                qEl.classList.add('autoshrink');
+                qEl.textContent = term;
+                renderFlashCard(term, def);
+            }
+            setTimeout(() => {
+                qEl.classList.add('autoshrink');
+                autoshrinkAll();
+            }, 0);
+        }
+
+        let wasNewBeforeAnswer = false;
+
+        function updateCardSchedule(row, isCorrect) {
+            const C = payload.schema.lexiconCols;
+            const setSettings = payload?.setSettings || MOCK_SET_SETTINGS || {};
+            const ladder = parseLadder_(setSettings.Ladder || '');
+            const now = Date.now();
+            const denom = ladder[Math.min(row[C.step], ladder.length - 1)] || 1;
+            const due = parseDue_(row[C.due]);
+
+            if (isCorrect) {
+                row[C.step] = Math.min(row[C.step] + 1, ladder.length - 1);
+            } else {
+                row[C.step] = 0;
+                row[C.lapses]++;
+            }
+            row[C.reps]++;
+
+            const Inext = ladder[row[C.step]];
+            const delay = (due > 0) ? (now - due) / 86400000 : 0;
+            const scale = Math.min(2, Math.max(0.5, 1 + 0.3 * (delay / denom)));
+            const nextDue = new Date(now + Inext * scale * 86400000);
+            row[C.due] = `${nextDue.getUTCFullYear()}-${String(nextDue.getUTCMonth() + 1).padStart(2, '0')}-${String(nextDue.getUTCDate()).padStart(2, '0')}`;
+        }
+
+        function onAnswer(chosenIndex, correctIndex) {
+            log_('[onAnswer] chosen=' + chosenIndex + ' correct=' + correctIndex);
+            const C = payload.schema.lexiconCols;
+            const isCorrect = chosenIndex === correctIndex;
+            const row = payload.items[payload.state.currentIndex];
+
+            wasNewBeforeAnswer = row[C.reps] === 0 && row[C.step] === 0;
+            if (wasNewBeforeAnswer) payload.state.servedNewToday++;
+
+            updateCardSchedule(row, isCorrect);
+            payload.state.answeredCount++;
+            log_('[onAnswer] answeredCount=' + payload.state.answeredCount);
+            maybeAutosave_();
+            showFeedback_(chosenIndex, correctIndex);
+        }
+
+        function showFeedback_(chosenIndex, correctIndex) {
+            const isMCQ = !!document.querySelector('.answer');       // MCQ present?
+            const flipCard = document.querySelector('.flip-card');    // Flash present?
+            const okBtn = document.querySelector('.fc-btn.correct');
+            const noBtn = document.querySelector('.fc-btn.wrong');
+
+            // MCQ visuals (unchanged)
+            const btns = Array.from(document.querySelectorAll('.answer'));
+            btns.forEach(b => b.classList.remove('correct', 'wrong', 'selected-wrong'));
+
+            const isCorrect = (chosenIndex === correctIndex);
+
+            if (isCorrect) {
+                setFeedback_('<span class="success">✓ Correct</span>');
+                if (isMCQ && btns[correctIndex]) btns[correctIndex].classList.add('correct');
+
+                // Flash-specific visuals
+                if (flipCard) flipCard.classList.add('flash-correct');
+                if (okBtn) okBtn.classList.add('picked');
+            } else {
+                setFeedback_('<span class="error">✗ Incorrect. Tap/click anywhere or press any key to continue</span>');
+
+                if (isMCQ) {
+                    if (chosenIndex >= 0 && btns[chosenIndex]) btns[chosenIndex].classList.add('wrong', 'selected-wrong');
+                    if (btns[correctIndex]) btns[correctIndex].classList.add('correct');
+                }
+
+                // Flash-specific visuals
+                if (flipCard) flipCard.classList.add('flash-incorrect');
+                if (chosenIndex >= 0 && noBtn) noBtn.classList.add('picked');
+                if (okBtn) okBtn.classList.add('hint'); // subtle cue for the correct button
+            }
+
+            // Disable further input for BOTH modes
+            document.querySelectorAll('.answer').forEach(b => { b.disabled = true; b.classList.add('disabled'); });
+            document.querySelectorAll('.fc-btn').forEach(b => { b.disabled = true; b.classList.add('disabled'); });
+
+            // Continue-on-interaction (kept as-is)
+            let continueTimer = null;
+            const done = () => {
+                if (continueTimer) {
+                    clearTimeout(continueTimer);
+                    continueTimer = null;
+                }
+                document.removeEventListener('keydown', onKey, true);
+                document.removeEventListener('click', onClick, true);
+                wasNewBeforeAnswer = false;
+                goNext();
+            };
+            const onKey = (e) => done();
+            const onClick = (e) => done();
+            document.addEventListener('keydown', onKey, true);
+            document.addEventListener('click', onClick, true);
+            if (isCorrect) {
+                continueTimer = setTimeout(done, 400);
+            }
+        }
+
+        function goNext() {
+            // Stop any playing audio
+            _audioRequestId++;
+            const audio = _audioEl || initAudioElement();
+            try {
+                audio.pause();
+                audio.currentTime = 0;
+            } catch (e) { }
+
+            payload.state.currentIndex = decideNextIndex();
+            if (payload.state.currentIndex < 0) {
+                showDone(payload.state.answeredCount, payload.items.length);
+                return;
+            }
+            setProgress();
+            renderTerm();
+        }
+
+        // [2025-11-06 12:05] Final save when session completes (fire-and-forget)
+        function showDone(score, totalAnswered) {
+            $('quizArea').classList.add('hidden');
+            $('doneArea').classList.remove('hidden');
+            setFeedback_('');
+            $('scoreText').textContent = `${score} / ${totalAnswered}`;
+            const el = $('statusBarText');
+            if (el) el.textContent = 'Done';
+
+            // Async save
+            const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
+            const userProgress = payload.items.map(row => row.slice(cardWidth));
+            SaveQueue.add('progress', {
+                saveType: 'progress',
+                data: userProgress
+            });
+        }
+
+        function queueMoreNewItems(batchSize = 5) {
+            if (!payload?.state) return;
+            const state = payload.state;
+            const extra = Number(state.extraNewItems || 0);
+            state.extraNewItems = extra + batchSize;
+            $('doneArea').classList.add('hidden');
+            $('quizArea').classList.remove('hidden');
+            goNext();
+        }
+
+        async function onSettingsSave(modalEl) {
+            const newSettings = Array.isArray(settingsDraft)
+                ? settingsDraft.map(r => Array.isArray(r) ? r.slice() : [])
+                : [];
+            settings = newSettings.map(r => Array.isArray(r) ? r.slice() : []);
+            settingsDraft = null;
+            if (modalEl) modalEl.hidden = true;
+            setProgress();
+            applyTheme();
+            initAudioStateFromSettings();
+
+            // Re-render current card if one is showing
+            if (payload && payload.state && payload.state.currentIndex >= 0) {
+                renderTerm();
+            }
+
+            // Async save with optimistic UI
+            SaveQueue.add('settings', {
+                saveType: 'settings',
+                data: settings
+            });
+        }
+
+
+        // ---------- Startup wiring ----------
+        window.addEventListener('DOMContentLoaded', () => {
+            // Ensure audio element is created now that DOM is ready
+            if (!_audioEl || !_audioEl.parentElement) {
+                initAudioElement();
+            }
+            // Login modal handlers
+            const loginBtn = $('loginBtn');
+            const loginEmail = $('loginEmail');
+            const loginPassword = $('loginPassword');
+            const loginPwToggle = $('loginPwToggle');
+
+            // Helper to attach a password visibility toggle to an input + button
+            function attachPwToggle(inputEl, toggleBtn) {
+                if (!inputEl || !toggleBtn) return;
+                const setState = (show) => {
+                    try {
+                        inputEl.type = show ? 'text' : 'password';
+                        toggleBtn.setAttribute('aria-pressed', show ? 'true' : 'false');
+                        toggleBtn.textContent = show ? '🙈' : '👁️';
+                    } catch (e) { /* ignore */ }
+                };
+                // Initialize state
+                setState(inputEl.type === 'text');
+
+                toggleBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const showing = toggleBtn.getAttribute('aria-pressed') === 'true';
+                    setState(!showing);
+                });
+
+                // Support toggling via keyboard (Space/Enter)
+                toggleBtn.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleBtn.click();
+                    }
+                });
+            }
+
+            if (loginBtn) {
+                loginBtn.addEventListener('click', async () => {
+                    const email = loginEmail?.value?.trim() || '';
+                    const password = loginPassword?.value?.trim() || '';
+
+                    const sessionData = await attemptLogin(email, password);
+                    if (sessionData) {
+                        boot(sessionData);
+                    }
+                });
+            }
+
+            // Enter key support for login
+            [loginEmail, loginPassword].forEach(input => {
+                if (input) {
+                    input.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            loginBtn?.click();
+                        }
+                    });
+                }
+            });
+
+            // Menu dropdown handlers
+            const menuBtn = $('menuBtn');
+            const menuDropdown = $('menuDropdown');
+            log_('Menu elements found:', { menuBtn: !!menuBtn, menuDropdown: !!menuDropdown });
+
+            if (menuBtn && menuDropdown) {
+                let menuJustOpened = false;
+
+                menuBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    menuDropdown.hidden = !menuDropdown.hidden;
+
+                    if (!menuDropdown.hidden) {
+                        menuJustOpened = true;
+                        setTimeout(() => { menuJustOpened = false; }, 100);
+                    }
+                });
+
+                // Close menus when clicking outside
+                document.addEventListener('click', () => {
+                    if (!menuDropdown.hidden && !menuJustOpened) {
+                        menuDropdown.hidden = true;
+                        closeAllSubmenus();
+                    }
+                });
+
+                // Prevent menu from closing when clicking inside it
+                menuDropdown.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                });
+            }
+
+            // Close all submenus helper (define first)
+            const studySetSubmenu = $('studySetSubmenu');
+            const suspendSubmenu = $('suspendSubmenu');
+            const closeAllSubmenus = () => {
+                if (studySetSubmenu) studySetSubmenu.hidden = true;
+                if (suspendSubmenu) suspendSubmenu.hidden = true;
+            };
+
+            // Menu item handlers
+            const studySetMenuItem = $('studySetMenuItem');
+            const testModeMenuItem = $('testModeMenuItem');
+            const suspendMenuItem = $('suspendMenuItem');
+            const settingsMenuItem = $('settingsMenuItem');
+
+            if (studySetMenuItem && studySetSubmenu) {
+                studySetMenuItem.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const hasNoSets = payload && payload.availableSets && payload.availableSets.length === 0;
+                    if (hasNoSets) {
+                        const adminEmail = payload.adminEmail || 'administrator';
+                        alert(`No study sets available. Contact admin (${adminEmail}) to enable access.`);
+                        if (menuDropdown) menuDropdown.hidden = true;
+                        return;
+                    }
+                    closeAllSubmenus();
+                    studySetSubmenu.hidden = false;
+                });
+            }
+
+            if (suspendMenuItem && suspendSubmenu) {
+                suspendMenuItem.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    populateSuspendBands();
+                    closeAllSubmenus();
+                    suspendSubmenu.hidden = false;
+                });
+            }
+
+            if (testModeMenuItem) {
+                testModeMenuItem.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (menuDropdown) menuDropdown.hidden = true;
+                    closeAllSubmenus();
+
+                    const hasNoSets = payload && payload.availableSets && payload.availableSets.length === 0;
+                    if (hasNoSets) {
+                        const adminEmail = payload.adminEmail || 'administrator';
+                        alert(`No study sets available. Contact admin (${adminEmail}) to enable access.`);
+                        return;
+                    }
+
+                    if (testState) {
+                        exitTestMode();
+                    } else {
+                        startTestMode();
+                    }
+                });
+            }
+
+            if (settingsMenuItem) {
+                settingsMenuItem.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (menuDropdown) menuDropdown.hidden = true;
+                    closeAllSubmenus();
+
+                    settingsDraft = settings.map(r => Array.isArray(r) ? r.slice() : []);
+                    renderSettingsUI({ settings: settingsDraft });
+                    applyTheme();
+                    $('settingsModal').hidden = false;
+                });
+            }
+
+            // Change password menu item
+            const changePasswordMenuItem = $('changePasswordMenuItem');
+            const changePasswordModal = $('changePasswordModal');
+            const cpCurrent = $('cpCurrent');
+            const cpNew = $('cpNew');
+            const cpConfirm = $('cpConfirm');
+            const cpError = $('cpError');
+            const cpSaveBtn = $('changePasswordSaveBtn');
+            const cpCancelBtn = $('changePasswordCancelBtn');
+            const cpCurrentToggle = $('cpCurrentToggle');
+            const cpNewToggle = $('cpNewToggle');
+            const cpConfirmToggle = $('cpConfirmToggle');
+
+            // Attach reveal toggles to login and change-password inputs
+            try {
+                attachPwToggle(loginPassword, loginPwToggle);
+                attachPwToggle(cpCurrent, cpCurrentToggle);
+                attachPwToggle(cpNew, cpNewToggle);
+                attachPwToggle(cpConfirm, cpConfirmToggle);
+            } catch (e) {
+                log_('attachPwToggle failed', e);
+            }
+
+            if (changePasswordMenuItem) {
+                changePasswordMenuItem.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (menuDropdown) menuDropdown.hidden = true;
+                    closeAllSubmenus();
+                    if (!currentCredentials || !currentCredentials.email) {
+                        showLoginModal();
+                        return;
+                    }
+                    if (cpCurrent) cpCurrent.value = '';
+                    if (cpNew) cpNew.value = '';
+                    if (cpConfirm) cpConfirm.value = '';
+                    if (cpError) { cpError.style.display = 'none'; cpError.textContent = ''; }
+                    if (changePasswordModal) changePasswordModal.hidden = false;
+                    setTimeout(() => cpCurrent?.focus(), 50);
+                });
+            }
+
+            if (cpCancelBtn) cpCancelBtn.addEventListener('click', () => {
+                if (changePasswordModal) changePasswordModal.hidden = true;
+            });
+
+            if (cpSaveBtn) cpSaveBtn.addEventListener('click', async () => {
+                try {
+                    if (!currentCredentials || !currentCredentials.email) {
+                        if (cpError) { cpError.textContent = 'Not logged in'; cpError.style.display = 'block'; }
+                        return;
+                    }
+                    const cur = cpCurrent?.value || '';
+                    const nw = cpNew?.value || '';
+                    const conf = cpConfirm?.value || '';
+                    if (!cur || !nw || !conf) {
+                        if (cpError) { cpError.textContent = 'Fill all fields'; cpError.style.display = 'block'; }
+                        return;
+                    }
+                    // Disallow leading apostrophe to avoid Sheets format issues
+                    if (cur.startsWith("'") || nw.startsWith("'") || conf.startsWith("'")) {
+                        if (cpError) { cpError.textContent = "Passwords cannot start with an apostrophe (')"; cpError.style.display = 'block'; }
+                        return;
+                    }
+                    if (nw !== conf) {
+                        if (cpError) { cpError.textContent = 'New passwords do not match'; cpError.style.display = 'block'; }
+                        return;
+                    }
+                    if (nw.length < 6) {
+                        if (cpError) { cpError.textContent = 'Password too short (min 6)'; cpError.style.display = 'block'; }
+                        return;
+                    }
+
+                    cpSaveBtn.disabled = true;
+                    const resp = await service.changePassword({ userId: currentCredentials.email, currentPassword: cur, newPassword: nw });
+                    cpSaveBtn.disabled = false;
+                    if (resp && resp.success) {
+                        // Update local stored credentials
+                        saveCredentials(currentCredentials.email, nw, currentCredentials.setName);
+                        if (changePasswordModal) changePasswordModal.hidden = true;
+                        showToast('Password changed', 'info');
+                    } else {
+                        const err = resp && resp.error ? resp.error : 'UNKNOWN_ERROR';
+                        if (cpError) { cpError.textContent = String(err); cpError.style.display = 'block'; }
+                    }
+                } catch (e) {
+                    cpSaveBtn.disabled = false;
+                    if (cpError) { cpError.textContent = String(e.message || e); cpError.style.display = 'block'; }
+                }
+            });
+
+            // Feedback modal handlers
+            const feedbackMenuItem = $('feedbackMenuItem');
+            const feedbackModal = $('feedbackModal');
+            const feedbackText = $('feedbackText');
+            const feedbackCharCount = $('feedbackCharCount');
+            const feedbackSendBtn = $('feedbackSendBtn');
+            const feedbackCancelBtn = $('feedbackCancelBtn');
+
+            if (feedbackMenuItem && feedbackModal && feedbackText) {
+                feedbackMenuItem.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (menuDropdown) menuDropdown.hidden = true;
+                    closeAllSubmenus();
+                    feedbackText.value = '';
+                    if (feedbackCharCount) feedbackCharCount.textContent = '0';
+                    if (feedbackSendBtn) {
+                        feedbackSendBtn.disabled = false;
+                        feedbackSendBtn.textContent = 'Send';
+                    }
+                    feedbackModal.hidden = false;
+                    setTimeout(() => feedbackText.focus(), 100);
+                });
+            }
+
+            if (feedbackText && feedbackCharCount) {
+                feedbackText.addEventListener('input', () => {
+                    const len = feedbackText.value.length;
+                    feedbackCharCount.textContent = String(len);
+                    if (len > 1000) {
+                        feedbackText.value = feedbackText.value.substring(0, 1000);
+                        feedbackCharCount.textContent = '1000';
+                    }
+                });
+            }
+
+            if (feedbackCancelBtn && feedbackModal) {
+                feedbackCancelBtn.addEventListener('click', () => {
+                    feedbackModal.hidden = true;
+                });
+            }
+
+            if (feedbackSendBtn && feedbackModal && feedbackText) {
+                feedbackSendBtn.addEventListener('click', async () => {
+                    const message = feedbackText.value.trim();
+                    if (!message) {
+                        alert('Please enter your feedback');
+                        return;
+                    }
+
+                    const userId = currentCredentials?.email || 'unknown';
+                    const currentSet = payload?.activeSet || '';
+
+                    // Show success immediately (optimistic UI)
+                    feedbackModal.hidden = true;
+
+                    // Async save
+                    SaveQueue.add('feedback', {
+                        saveType: 'feedback',
+                        feedbackData: {
+                            userId,
+                            currentSet,
+                            message
+                        }
+                    });
+                });
+            }
+
+            // Suspend modal handlers
+            const suspendModal = $('suspendModal');
+            const suspendCancelBtn = $('suspendCancelBtn');
+            const suspendSaveBtn = $('suspendSaveBtn');
+
+            if (suspendCancelBtn && suspendModal) {
+                suspendCancelBtn.addEventListener('click', () => {
+                    suspendModal.hidden = true;
+                });
+            }
+
+            if (suspendSaveBtn && suspendModal) {
+                suspendSaveBtn.addEventListener('click', () => {
+                    const C = payload.schema.lexiconCols;
+                    const checkboxes = suspendModal.querySelectorAll('input[type="checkbox"]');
+
+                    checkboxes.forEach(cb => {
+                        const index = parseInt(cb.dataset.index);
+                        if (index >= 0 && index < payload.items.length) {
+                            payload.items[index][C.suspended] = cb.checked;
+                        }
+                    });
+
+                    suspendModal.hidden = true;
+
+                    // Async save
+                    const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
+                    const userProgress = payload.items.map(row => row.slice(cardWidth));
+                    SaveQueue.add('progress', {
+                        saveType: 'progress',
+                        data: userProgress
+                    });
+                });
+            }
+
+            // Settings modal handlers
+            const modal = $('settingsModal');
+            const backdrop = $('settingsBackdrop');
+            const btnSave = $('settingsSaveBtn');
+            const btnCancel = $('settingsCancelBtn');
+            if (backdrop) backdrop.addEventListener('click', (e) => { e.stopPropagation(); });
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && !modal.hidden) {
+                    e.preventDefault();
+                }
+            });
+            if (btnCancel && modal) btnCancel.addEventListener('click', () => {
+                settingsDraft = null;
+                modal.hidden = true;
+            });
+            if (btnSave && modal) btnSave.addEventListener('click', () => onSettingsSave(modal));
+            const extraBtn = $('extraNewBtn');
+            if (extraBtn) extraBtn.addEventListener('click', () => queueMoreNewItems(5));
+
+            // Logout menu item handler
+            const logoutMenuItem = $('logoutMenuItem');
+            if (logoutMenuItem) {
+                logoutMenuItem.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (menuDropdown) menuDropdown.hidden = true;
+                    closeAllSubmenus();
+
+                    // Clear all state
+                    clearCredentials();
+                    payload = null;
+                    settings = [];
+                    testState = null;
+
+                    // Hide quiz/done areas to clear background
+                    $('quizArea').classList.add('hidden');
+                    $('doneArea').classList.add('hidden');
+
+                    // Clear status bar
+                    const sb = $('statusBarText');
+                    if (sb) sb.textContent = '';
+
+                    showLoginModal();
+                });
+            }
+
+            // Restore pending saves from previous session
+            SaveQueue.restore();
+
+            // Try to auto-login with stored credentials, otherwise show login modal
+            const stored = loadCredentials();
+            if (stored && stored.email && stored.password) {
+                boot().catch(err => {
+                    log_('Auto-login failed:', err);
+                    showLoginModal();
+                });
+            } else {
+                showLoginModal();
+            }
+        });
+        window.addEventListener('orientationchange', () => setTimeout(autoshrinkAll, 50));
+        window.addEventListener('resize', () => setTimeout(autoshrinkAll, 50));
+
+        /* ---------- Text-fit helpers ---------- */
+        function fitTextToBox(el, { max = 28, min = 14, step = 0.5 } = {}) {
+            if (!el) return;
+            const parent = el.parentElement;
+            if (!parent) return;
+
+            let size = max;
+            el.style.fontSize = size + 'px';
+
+            const fits = () => {
+                const heightFits = el.scrollHeight <= parent.clientHeight;
+                const widthFits = el.scrollWidth <= parent.clientWidth;
+                return heightFits && widthFits;
+            };
+
+            let guard = 200;
+            while (!fits() && size > min && guard-- > 0) {
+                size -= step;
+                el.style.fontSize = size + 'px';
+            }
+        }
+        function autoshrinkAll() {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    // First, fit the term text independently
+                    const termEl = $('termText');
+                    if (termEl && termEl.textContent) {
+                        const termHeader = $('termHeader');
+                        if (termHeader) {
+                            const textLen = termEl.textContent.trim().length;
+                            let size = textLen <= 3 ? 80 : (textLen <= 10 ? 48 : 28);
+                            termEl.style.fontSize = size + 'px';
+                            let guard = 200;
+                            while (termEl.scrollHeight > termHeader.clientHeight && size > 8 && guard-- > 0) {
+                                size -= 0.5;
+                                termEl.style.fontSize = size + 'px';
+                            }
+                        }
+                    }
+
+                    // Then fit answer labels
+                    const labelNodes = Array.from(document.querySelectorAll('.answer-label'));
+                    let smallest = null;
+                    labelNodes.forEach(el => {
+                        const textLen = el.textContent.trim().length;
+                        const maxSize = textLen <= 3 ? 60 : (textLen <= 10 ? 40 : 24);
+                        fitTextToBox(el, { max: maxSize, min: 6, step: 0.5 });
+                        const size = parseFloat(window.getComputedStyle(el).fontSize) || null;
+                        if (!size) return;
+                        if (smallest === null || size < smallest) {
+                            smallest = size;
+                        }
+                    });
+                    if (smallest !== null) {
+                        labelNodes.forEach(el => {
+                            el.style.fontSize = smallest + 'px';
+                        });
+                    }
+
+                    // Fit flashcard faces
+                    document.querySelectorAll('.flip-face').forEach(el => {
+                        const textLen = el.textContent.trim().length;
+                        const maxSize = textLen <= 3 ? 120 : (textLen <= 10 ? 80 : 38);
+                        fitTextToBox(el, { max: maxSize, min: 12, step: 0.5 });
+                    });
+                });
+            });
+        }
+
+    </script>
+</body>
+
 </html>
