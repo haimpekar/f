@@ -1440,6 +1440,32 @@
             log_(msg);
         }
 
+        function maskSensitiveFields(obj) {
+            if (!obj || typeof obj !== 'object') return obj;
+            const clone = Array.isArray(obj) ? [...obj] : { ...obj };
+            ['password', 'currentPassword', 'newPassword'].forEach((field) => {
+                if (Object.prototype.hasOwnProperty.call(clone, field) && clone[field]) {
+                    clone[field] = '•••';
+                }
+            });
+            return clone;
+        }
+
+        function summarizeResult(result) {
+            if (!result || typeof result !== 'object') return result;
+            const summary = {};
+            ['success', 'error', 'userId', 'activeSet', 'availableSets', 'adminEmail'].forEach(key => {
+                if (Object.prototype.hasOwnProperty.call(result, key)) {
+                    summary[key] = result[key];
+                }
+            });
+            if (Array.isArray(result.cards)) summary.cards = `cards[${result.cards.length}]`;
+            if (Array.isArray(result.userSettings)) summary.userSettings = `settings[${result.userSettings.length}]`;
+            if (Array.isArray(result.userProgress)) summary.userProgress = `progress[${result.userProgress.length}]`;
+            if (Array.isArray(result.availableSets)) summary.availableSets = `availableSets[${result.availableSets.length}]`;
+            return summary;
+        }
+
         function showConfirm(message, onConfirm) {
             const modal = $('confirmModal');
             const messageEl = $('confirmMessage');
@@ -1509,7 +1535,7 @@
         };
 
         const MOCK_USER_SETTINGS = [
-            ['UserID', 'demo@example.com'],
+            ['UserID', 'local@local.com'],
             ['NewItemsPerDay', 4],
             ['QuizMode', false],
             ['TestDueDate', '2025-01-01'],
@@ -1519,8 +1545,7 @@
         ];
 
         const MOCK_CREDENTIALS = {
-            'demo@example.com': 'demo123',
-            'test@example.com': 'test456'
+            'local@local.com': 'local123',
         };
 
         let payload = null; // { items, settings, schema, state }
@@ -1541,10 +1566,19 @@
 
         // Cloudflare Worker URL (proxies to Apps Script)
         const API_URL = 'https://fsrs.haim-pekar.workers.dev/';
-        // Auto-detect local file:// protocol and force mock mode
-        const IS_LOCAL = window.location.protocol === 'file:';
-        const HAS_SERVER = !!API_URL && !IS_LOCAL;
-        const IS_MOCK = !HAS_SERVER; // single source of truth for mode
+
+        // Mode selection is based only on credentials.
+        // - If a call provides `userId` that exists in `MOCK_CREDENTIALS`, the call uses mock
+        // - Else if stored `currentCredentials.email` exists and matches `MOCK_CREDENTIALS`, use mock
+        // - Otherwise the call uses the deployed server implementation
+        // This removes any file:// or forceServer heuristics; mode is decided per-call by credentials.
+        let currentCredentials = null; // { email, password }
+        try {
+            loadCredentials();
+        } catch (e) {
+            console.warn('[INIT] loadCredentials() failed during credential-only init', e);
+        }
+        console.log('[INIT] Credential-only mode selection active. Stored email:', currentCredentials && currentCredentials.email ? currentCredentials.email : '<none>');
 
         function shuffleArray(array) {
             const shuffled = [...array];
@@ -1554,7 +1588,7 @@
             }
             return shuffled;
         }
-        let currentCredentials = null; // { email, password }
+
 
         // Authentication helpers
         function saveCredentials(email, password, setName = null) {
@@ -1835,87 +1869,125 @@
             }
         }
 
-        // API service using fetch() instead of google.script.run
-        const service = HAS_SERVER ? {
-            getSession: (arg) => retryWithBackoff(async () => {
+        // API service: dynamically route calls to mock or real server based on
+        // the provided or stored credentials. Decision rules:
+        // - If the call provides a `userId` and that email exists in `MOCK_CREDENTIALS` => mock
+        // - Else if stored `currentCredentials.email` exists and matches `MOCK_CREDENTIALS` => mock
+        // - Otherwise: server
+        const serverImpl = {
+            async getSession(arg) {
                 const t0 = performance.now();
                 console.log(`[PERF→FRONT] getSession START`);
-                const t1 = performance.now();
-                const payload = JSON.stringify({ action: 'getSession', ...arg });
-                console.log(`[PERF→FRONT] JSON.stringify ${Math.round(performance.now() - t1)}ms`);
+                const payloadObj = { action: 'getSession', ...arg };
+                const sanitized = maskSensitiveFields(payloadObj);
+                console.log(`[FRONT→BACK] getSession payload`, sanitized);
+                const payload = JSON.stringify(payloadObj);
+                console.log(`[PERF→FRONT] JSON.stringify ${Math.round(performance.now() - t0)}ms`);
                 const t2 = performance.now();
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: payload
                 });
-                console.log(`[PERF→FRONT] fetch() ${Math.round(performance.now() - t2)}ms`);
-                const t3 = performance.now();
-                const result = await response.json();
-                console.log(`[PERF→FRONT] response.json() ${Math.round(performance.now() - t3)}ms`);
-                const size = JSON.stringify(result).length;
-                console.log(`[PERF→FRONT] getSession TOTAL ${Math.round(performance.now() - t0)}ms`);
-                console.log(`[FRONT←BACK] getSession ${(size / 1024).toFixed(1)}KB ${Math.round(performance.now() - t0)}ms`);
-                if (result && Array.isArray(result.debugLog) && result.debugLog.length) {
-                    logBackendDebug(result.debugLog, 'getSession');
+                console.log(`[PERF→FRONT] fetch() ${Math.round(performance.now() - t2)}ms status=${response.status}`);
+
+                const contentType = (response.headers.get('Content-Type') || response.headers.get('content-type') || '').toLowerCase();
+                if (!contentType.includes('application/json')) {
+                    const text = await response.text();
+                    console.error('[FRONT←BACK] getSession expected JSON but received:', response.status, text);
+                    throw new Error('Non-JSON response from server: ' + (String(text).slice(0, 1000)));
                 }
-                if (result === null || result === undefined) {
-                    throw new Error('Server returned null');
+                try {
+                    const result = await response.json();
+                    console.log(`[FRONT←BACK] getSession response`, summarizeResult(result));
+                    const size = JSON.stringify(result).length;
+                    console.log(`[PERF→FRONT] getSession TOTAL ${Math.round(performance.now() - t0)}ms`);
+                    console.log(`[FRONT←BACK] getSession ${(size / 1024).toFixed(1)}KB ${Math.round(performance.now() - t0)}ms`);
+                    if (result && Array.isArray(result.debugLog) && result.debugLog.length) logBackendDebug(result.debugLog, 'getSession');
+                    if (result === null || result === undefined) throw new Error('Server returned null');
+                    return result;
+                } catch (err) {
+                    const raw = await response.text().catch(() => '');
+                    console.error('[FRONT←BACK] getSession JSON parse failed:', err.message, 'raw:', raw.slice ? raw.slice(0, 2000) : raw);
+                    throw err;
                 }
-                return result;
-            }),
-            saveSession: (payload) => retryWithBackoff(async () => {
+            },
+
+            async saveSession(payload) {
                 const t0 = performance.now();
+                const sanitized = maskSensitiveFields(payload);
+                console.log(`[FRONT→BACK] saveSession payload`, sanitized);
                 const size = JSON.stringify(payload).length;
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'saveSession', ...payload })
                 });
-                const result = await response.json();
-                const answered = payload?.data ? `answered=${_lastSavedAnswerCount}` : '';
-                log_(`[FRONT→BACK] saveSession(${payload.saveType}) ${answered} ${(size / 1024).toFixed(1)}KB ${Math.round(performance.now() - t0)}ms`);
-                if (result && Array.isArray(result.debugLog) && result.debugLog.length) {
-                    logBackendDebug(result.debugLog, 'saveSession');
+                log_(`[PERF→FRONT] saveSession fetch() ${Math.round(performance.now() - t0)}ms status=${response.status}`);
+
+                const contentType = (response.headers.get('Content-Type') || response.headers.get('content-type') || '').toLowerCase();
+                if (!contentType.includes('application/json')) {
+                    const text = await response.text();
+                    console.error('[FRONT←BACK] saveSession expected JSON but received:', response.status, text.slice(0, 2000));
+                    throw new Error('Non-JSON response from server: ' + (String(text).slice(0, 1000)));
                 }
-                return result;
-            }),
-            changePassword: (payload) => retryWithBackoff(async () => {
+                try {
+                    const result = await response.json();
+                    console.log(`[FRONT←BACK] saveSession response`, summarizeResult(result));
+                    const answered = payload?.data ? `answered=${_lastSavedAnswerCount}` : '';
+                    log_(`[FRONT→BACK] saveSession(${payload.saveType}) ${answered} ${(size / 1024).toFixed(1)}KB ${Math.round(performance.now() - t0)}ms`);
+                    if (result && Array.isArray(result.debugLog) && result.debugLog.length) logBackendDebug(result.debugLog, 'saveSession');
+                    return result;
+                } catch (err) {
+                    const raw = await response.text().catch(() => '');
+                    console.error('[FRONT←BACK] saveSession JSON parse failed:', err.message, 'raw:', raw.slice ? raw.slice(0, 2000) : raw);
+                    throw err;
+                }
+            },
+
+            async changePassword(payload) {
                 const t0 = performance.now();
+                console.log(`[FRONT→BACK] changePassword payload`, maskSensitiveFields(payload));
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'changePassword', ...payload })
                 });
-                const result = await response.json();
-                log_(`[FRONT→BACK] changePassword ${(result && result.success) ? 'OK' : 'FAIL'} ${Math.round(performance.now() - t0)}ms`);
-                return result;
-            }),
+                log_(`[PERF→FRONT] changePassword fetch() ${Math.round(performance.now() - t0)}ms status=${response.status}`);
 
-        } : {
+                const contentType = (response.headers.get('Content-Type') || response.headers.get('content-type') || '').toLowerCase();
+                if (!contentType.includes('application/json')) {
+                    const text = await response.text();
+                    console.error('[FRONT←BACK] changePassword expected JSON but received:', response.status, text.slice(0, 2000));
+                    throw new Error('Non-JSON response from server: ' + (String(text).slice(0, 1000)));
+                }
+                try {
+                    const result = await response.json();
+                    console.log(`[FRONT←BACK] changePassword response`, summarizeResult(result));
+                    log_(`[FRONT→BACK] changePassword ${(result && result.success) ? 'OK' : 'FAIL'} ${Math.round(performance.now() - t0)}ms`);
+                    return result;
+                } catch (err) {
+                    const raw = await response.text().catch(() => '');
+                    console.error('[FRONT←BACK] changePassword JSON parse failed:', err.message, 'raw:', raw.slice ? raw.slice(0, 2000) : raw);
+                    throw err;
+                }
+            }
+        };
+
+        const mockImpl = {
             _lastSaved: null,
             async getSession(arg) {
-                // Validate credentials in mock mode
                 if (arg && arg.userId && arg.password) {
                     const email = String(arg.userId).toLowerCase();
                     const password = String(arg.password);
-
-                    if (!MOCK_CREDENTIALS[email]) {
-                        return { success: false, error: 'USER_NOT_FOUND' };
-                    }
-
-                    if (MOCK_CREDENTIALS[email] !== password) {
-                        return { success: false, error: 'WRONG_PASSWORD' };
-                    }
+                    if (!MOCK_CREDENTIALS[email]) return { success: false, error: 'USER_NOT_FOUND' };
+                    if (MOCK_CREDENTIALS[email] !== password) return { success: false, error: 'WRONG_PASSWORD' };
                 }
-
                 const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
                 const cards = MOCK_ITEMS;
                 const userProgress = MOCK_PROGRESS;
                 const userIdRow = MOCK_USER_SETTINGS.find(r => r[0] === 'UserID');
-                if (!userIdRow || !userIdRow[1]) {
-                    return { success: false, error: 'MOCK_USER_SETTINGS missing UserID' };
-                }
+                if (!userIdRow || !userIdRow[1]) return { success: false, error: 'MOCK_USER_SETTINGS missing UserID' };
                 return {
                     success: true,
                     userId: userIdRow[1],
@@ -1932,8 +2004,7 @@
             async saveSession(payload) {
                 this._lastSaved = payload;
                 return { success: true };
-            }
-            ,
+            },
             async changePassword(arg) {
                 if (!arg || !arg.userId || !arg.currentPassword || !arg.newPassword) return { success: false, error: 'MISSING_FIELDS' };
                 const email = String(arg.userId).toLowerCase();
@@ -1944,6 +2015,30 @@
                 MOCK_CREDENTIALS[email] = nw;
                 return { success: true };
             }
+        };
+
+        // Router: choose implementation per-call using provided userId or stored credentials
+        function chooseImplForCall(argOrPayload) {
+            const email = (argOrPayload && (argOrPayload.userId || argOrPayload.userId === 0))
+                ? String(argOrPayload.userId).toLowerCase()
+                : (currentCredentials && currentCredentials.email ? String(currentCredentials.email).toLowerCase() : null);
+            const useMock = email && (typeof MOCK_CREDENTIALS === 'object') && Object.prototype.hasOwnProperty.call(MOCK_CREDENTIALS, email);
+            return useMock ? mockImpl : serverImpl;
+        }
+
+        const service = {
+            getSession: (arg) => retryWithBackoff(async () => {
+                const impl = chooseImplForCall(arg);
+                return impl.getSession(arg);
+            }),
+            saveSession: (payload) => retryWithBackoff(async () => {
+                const impl = chooseImplForCall(payload);
+                return impl.saveSession(payload);
+            }),
+            changePassword: (payload) => retryWithBackoff(async () => {
+                const impl = chooseImplForCall(payload);
+                return impl.changePassword(payload);
+            })
         };
 
         async function maybeAutosave_() {
@@ -2993,7 +3088,14 @@
             });
             log_('[buildPayload] Built ' + items.length + ' items');
 
-            const schema = !IS_MOCK
+            // Determine mock-vs-server for this session using credentials or session hint
+            const isMock = (typeof sess === 'object' && typeof sess._isMock === 'boolean')
+                ? sess._isMock
+                : (currentCredentials && currentCredentials.email
+                    ? Object.prototype.hasOwnProperty.call(MOCK_CREDENTIALS, String(currentCredentials.email).toLowerCase())
+                    : false);
+
+            const schema = !isMock
                 ? (sess.studySetSchema && sess.userProgressSchema
                     ? { lexiconCols: buildLexiconSchema(sess.studySetSchema, sess.userProgressSchema) }
                     : (() => { throw new Error('Missing server schema'); })())
@@ -3015,7 +3117,7 @@
                     sessionStatusText: '',
                     _armed: false
                 },
-                _isMock: IS_MOCK
+                _isMock: !!isMock
             };
         }
 
@@ -3219,7 +3321,11 @@
             } catch (err) {
                 log_('boot: caught error', err);
                 log_('boot: error stack', err.stack);
-                if (!IS_MOCK) {
+                // Decide mock fallback using credentials only (no global IS_MOCK)
+                const isMock = (currentCredentials && currentCredentials.email)
+                    ? Object.prototype.hasOwnProperty.call(MOCK_CREDENTIALS, String(currentCredentials.email).toLowerCase())
+                    : false;
+                if (!isMock) {
                     showError_('Failed to load session from server: ' + (err.message || String(err)));
                     return;
                 }
