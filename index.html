@@ -3239,12 +3239,31 @@
             db: null,
 
             async init() {
-                if (this.db) return this.db;
+                if (this.db) {
+                    // If the store is missing (old DB), rebuild.
+                    if (!this.db.objectStoreNames.contains(this.storeName)) {
+                        try { this.db.close(); } catch (e) { /* ignore */ }
+                        await indexedDB.deleteDatabase(this.dbName);
+                        this.db = null;
+                    } else {
+                        return this.db;
+                    }
+                }
+
                 return new Promise((resolve, reject) => {
                     const request = indexedDB.open(this.dbName, 1);
                     request.onerror = () => reject(request.error);
                     request.onsuccess = () => {
                         this.db = request.result;
+                        // If the store is somehow missing, rebuild and re-init once.
+                        if (!this.db.objectStoreNames.contains(this.storeName)) {
+                            try { this.db.close(); } catch (e) { /* ignore */ }
+                            indexedDB.deleteDatabase(this.dbName).onsuccess = () => {
+                                this.db = null;
+                                this.init().then(resolve).catch(reject);
+                            };
+                            return;
+                        }
                         resolve(this.db);
                     };
                     request.onupgradeneeded = (e) => {
