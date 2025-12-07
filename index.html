@@ -1,4 +1,4 @@
-<!-- 2025-10-31 13:45 IDT — Sheet Quiz UI (standalone-friendly) -->
+<!-- 2025-12-06 — Sheet Quiz UI (standalone-friendly) -->
 <!DOCTYPE html>
 <html>
 
@@ -6,12 +6,6 @@
     <meta charset="utf-8" />
     <title>Sheet Quiz UI</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-    <script>
-        // Test console immediately on page load
-        console.log('=== PAGE LOADED - Console is working ===');
-        console.log('Current URL:', window.location.href);
-        console.log('Timestamp:', new Date().toISOString());
-    </script>
 
     <style>
         /* Reset + full height */
@@ -202,27 +196,6 @@
             font-size: var(--mcq-font-size);
             text-align: center;
             color: #000;
-        }
-
-        .term-image {
-            margin: 12px auto 0 auto;
-            width: 100%;
-            max-width: clamp(280px, 60vw, 540px);
-            max-height: 35vh;
-            border-radius: 14px;
-            display: none;
-        }
-
-        .term-image.active {
-            display: block;
-        }
-
-        .term-image img {
-            width: 100%;
-            height: 100%;
-            border-radius: 14px;
-            object-fit: contain;
-            box-shadow: 0 6px 18px rgba(0, 0, 0, .15);
         }
 
         #termText {
@@ -516,11 +489,6 @@
             background: #f1fff1;
         }
 
-        .fc-btn.almost {
-            border-color: #caa600;
-            background: #fff9e6;
-        }
-
         .fc-btn.wrong {
             border-color: #a11;
             background: #fff1f1;
@@ -563,15 +531,23 @@
         .settings-head {
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: space-between;
             gap: 10px;
-            margin-bottom: 8px
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
         }
 
         .settings-head h3 {
             margin: 0;
             font-size: 16px;
             font-weight: 600
+        }
+
+        .settings-head .meta {
+            font-size: 12px;
+            color: #666;
+            font-weight: normal;
         }
 
         .settings-grid {
@@ -599,14 +575,6 @@
             .settings-grid .label {
                 font-size: 18px;
             }
-        }
-
-        .settings-grid .meta {
-            display: none;
-        }
-
-        body[data-theme="dark"] .settings-grid .meta {
-            color: #aaa;
         }
 
         .settings-grid select,
@@ -732,10 +700,10 @@
         }
 
         .menu-item {
-            display: flex;
+            display: block;
             align-items: center;
             justify-content: space-between;
-            padding: 12px 16px;
+            padding: 8px 0;
             cursor: pointer;
             border-bottom: 1px solid #eee;
             text-align: left;
@@ -751,6 +719,31 @@
 
         .menu-label {
             font-size: 16px;
+        }
+
+        .menu-item label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .menu-item select {
+            width: 100%;
+            padding: 6px 8px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            background: #f7f7f7;
+        }
+
+        .menu-item button {
+            width: 100%;
+            border: 1px solid #ccc;
+            background: #f7f7f7;
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+            text-align: left;
         }
 
         @media (max-width: 640px) {
@@ -812,41 +805,6 @@
         body[data-theme="dark"] .menu-item:hover,
         body[data-theme="dark"] .submenu-item:hover {
             background: #3a3a3f;
-        }
-
-        .menu-item {
-            display: block;
-            padding: 8px 0;
-            border-bottom: 1px solid #eee;
-        }
-
-        .menu-item:last-child {
-            border-bottom: none;
-        }
-
-        .menu-item label {
-            display: block;
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 4px;
-        }
-
-        .menu-item select {
-            width: 100%;
-            padding: 6px 8px;
-            border-radius: 6px;
-            border: 1px solid #ccc;
-            background: #f7f7f7;
-        }
-
-        .menu-item button {
-            width: 100%;
-            border: 1px solid #ccc;
-            background: #f7f7f7;
-            border-radius: 6px;
-            padding: 8px 12px;
-            cursor: pointer;
-            text-align: left;
         }
 
         .settings-footer {
@@ -1173,7 +1131,7 @@
         </div>
         <div class="menu-item" id="settingsMenuItem">
             <span class="menu-label">Settings</span>
-            <span class="menu-icon">⚙️</span>
+            <span class="menu-arrow">▶</span>
         </div>
         <div class="menu-item" id="feedbackMenuItem">
             <span class="menu-label">Send Feedback</span>
@@ -1196,6 +1154,17 @@
 
     <div id="suspendSubmenu" class="submenu" hidden>
         <div id="suspendBandList"></div>
+    </div>
+
+    <div id="settingsOptionsSubmenu" class="submenu" hidden>
+        <div id="setSettingsOption" class="submenu-item">
+            <span>Set Settings</span>
+            <span class="menu-icon" aria-hidden="true">⚙️</span>
+        </div>
+        <div id="userPreferencesOption" class="submenu-item">
+            <span>User Preferences</span>
+            <span class="menu-icon" aria-hidden="true">👤</span>
+        </div>
     </div>
 
 
@@ -1391,39 +1360,13 @@
                 _audioEl.style.display = 'none';
                 if (document.body) {
                     document.body.appendChild(_audioEl);
-                    console.log('[Audio] Element created and appended to body');
+                    log_('[Audio] Element created and appended to body');
                 } else {
                     console.warn('[Audio] Body not ready, will append later');
                 }
             }
             return _audioEl;
         }
-
-        // Debug functions (outside DOMContentLoaded for console access)
-        window.debugAudio = () => {
-            const audio = _audioEl || initAudioElement();
-            console.log('Audio Element:', audio);
-            console.log('Audio Enabled:', typeof _audioEnabled !== 'undefined' ? _audioEnabled : 'not initialized');
-            console.log('Current URL:', typeof _currentAudioUrl !== 'undefined' ? _currentAudioUrl : 'not initialized');
-            console.log('Audio Src:', audio.src);
-            console.log('Audio Paused:', audio.paused);
-            console.log('Audio Ready State:', audio.readyState);
-            return { audio, _audioEnabled, _currentAudioUrl };
-        };
-
-        window.testAudio = (url) => {
-            const audio = _audioEl || initAudioElement();
-            const testUrl = url || 'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=he&q=test';
-            console.log('Testing audio with URL:', testUrl);
-            audio.src = testUrl;
-            return audio.play().then(() => {
-                console.log('✓ Audio played successfully');
-                return true;
-            }).catch(err => {
-                console.error('✗ Audio play failed:', err.name, '-', err.message);
-                return false;
-            });
-        };
 
         function $(id) { return document.getElementById(id); }
         function showToast(msg, type = 'info') {
@@ -1550,19 +1493,20 @@
 
         let payload = null; // { items, settings, schema, state }
         let settings = []; // active settings for this run (editable)
-        let testState = null; // { setName, shuffledIndices, currentIndex, score, startTime, totalQuestions }
-        const DEBUG_MODE = true; // Set to false to disable all debug logging
+        let settingsViewMode = 'set'; // 'set' or 'user' - controls which settings panel is being edited
+        let testState = null; // { activeSet, shuffledIndices, currentIndex, score, startTime, totalQuestions }
+        const DEBUG_MODE = false; // Set to true to enable debug logging
         function log_(...args) { if (DEBUG_MODE) console.log('[DEBUG]', ...args); }
         function logBackendDebug(entries, label) {
             if (!Array.isArray(entries) || entries.length === 0) return;
             const title = label ? `[BACKEND DEBUG ${label}]` : '[BACKEND DEBUG]';
             console.groupCollapsed(title);
-            entries.forEach(line => console.log('[BACK]', line));
+            entries.forEach(line => log_('[BACK]', line));
             console.groupEnd();
         }
 
         // Force performance logs to always show (bypass DEBUG_MODE)
-        console.log('[INIT] Performance logging enabled - you should see timing logs in console');
+        log_('[INIT] Performance logging enabled - you should see timing logs in console');
 
         // Cloudflare Worker URL (proxies to Apps Script)
         const API_URL = 'https://fsrs.haim-pekar.workers.dev/';
@@ -1572,13 +1516,51 @@
         // - Else if stored `currentCredentials.email` exists and matches `MOCK_CREDENTIALS`, use mock
         // - Otherwise the call uses the deployed server implementation
         // This removes any file:// or forceServer heuristics; mode is decided per-call by credentials.
+        // user credentials stored under 'userData' includes metadata merged in: activeSet, availableSets, adminEmail
+        // userData schema: { email, password (not returned from server), ThemeLight, AudioAutoPlay, PlaybackSpeed, activeSet, availableSets }
         let currentCredentials = null; // { email, password }
+        let currentUserMetadata = null; // { activeSet, availableSets, adminEmail } (in-memory contains _ownerEmail for validation)
         try {
             loadCredentials();
+            // Migrate legacy metadata (if any) into the single `userData` key
+            (function migrateLegacyUserMetadata() {
+                try {
+                    if (!currentCredentials || !currentCredentials.email) return;
+                    const emailKey = String(currentCredentials.email).toLowerCase();
+                    const legacyKey = 'userMetadata';
+                    const legacyPerUser = `${legacyKey}_${emailKey}`;
+                    let migrated = false;
+                    const legacy = localStorage.getItem(legacyPerUser) || localStorage.getItem(legacyKey);
+                    if (legacy) {
+                        try {
+                            const parsed = JSON.parse(legacy);
+                            if (parsed) {
+                                // merge into currentCredentials
+                                if (parsed.activeSet) currentCredentials.activeSet = parsed.activeSet;
+                                if (Array.isArray(parsed.availableSets)) currentCredentials.availableSets = parsed.availableSets.slice();
+                                if (parsed.adminEmail) {
+                                    // Do not persist adminEmail to credentials; set it in-memory only
+                                    currentUserMetadata = currentUserMetadata || { activeSet: '', availableSets: [], adminEmail: 'administrator' };
+                                    currentUserMetadata.adminEmail = parsed.adminEmail;
+                                }
+                                // Persist using new key 'userData' (ensure defaults)
+                                ensureGlobalDefaults(currentCredentials);
+                                localStorage.setItem('userData', JSON.stringify(currentCredentials));
+                                migrated = true;
+                            }
+                        } catch (e) {/* ignore parse errors */ }
+                    }
+                    if (migrated) {
+                        try { localStorage.removeItem(legacyPerUser); } catch (e) { }
+                        try { localStorage.removeItem(legacyKey); } catch (e) { }
+                    }
+                } catch (e) { /* swallow */ }
+            })();
+            loadUserMetadata();
         } catch (e) {
             console.warn('[INIT] loadCredentials() failed during credential-only init', e);
         }
-        console.log('[INIT] Credential-only mode selection active. Stored email:', currentCredentials && currentCredentials.email ? currentCredentials.email : '<none>');
+        log_('[INIT] Credential-only mode selection active. Stored email:', currentCredentials && currentCredentials.email ? currentCredentials.email : '<none>');
 
         function shuffleArray(array) {
             const shuffled = [...array];
@@ -1591,17 +1573,42 @@
 
 
         // Authentication helpers
-        function saveCredentials(email, password, setName = null) {
-            const creds = { email, password, setName };
-            localStorage.setItem('userCredentials', JSON.stringify(creds));
+        function saveCredentials(email, password, activeSet = null) {
+            const creds = { email, password, activeSet };
+            // Preserve known global settings if set in memory
+            try {
+                if (currentCredentials) {
+                    if (currentCredentials.ThemeLight !== undefined) creds.ThemeLight = currentCredentials.ThemeLight;
+                    if (currentCredentials.AudioAutoPlay !== undefined) creds.AudioAutoPlay = currentCredentials.AudioAutoPlay;
+                    if (currentCredentials.PlaybackSpeed !== undefined) creds.PlaybackSpeed = currentCredentials.PlaybackSpeed;
+                }
+            } catch (e) { /* ignore */ }
+            // Merge known metadata into credentials if present
+            if (currentUserMetadata) {
+                if (currentUserMetadata.activeSet) creds.activeSet = currentUserMetadata.activeSet;
+                if (Array.isArray(currentUserMetadata.availableSets)) creds.availableSets = currentUserMetadata.availableSets.slice();
+                // adminEmail intentionally not persisted into userData (server is authoritative)
+            }
+            // Ensure default global settings exist in the saved userData
+            ensureGlobalDefaults(creds);
+            localStorage.setItem('userData', JSON.stringify(creds));
             currentCredentials = creds;
+            if (activeSet) {
+                saveUserMetadata({ activeSet });
+            }
         }
 
         function loadCredentials() {
             try {
-                const stored = localStorage.getItem('userCredentials');
+                // Support migration from old key 'userCredentials' (moved to 'userData')
+                let stored = localStorage.getItem('userData');
+                if (!stored) stored = localStorage.getItem('userCredentials');
                 if (stored) {
                     currentCredentials = JSON.parse(stored);
+                    // Ensure default global settings
+                    ensureGlobalDefaults(currentCredentials);
+                    // If old key found, ensure it's saved under new key and defaults persisted
+                    try { localStorage.setItem('userData', JSON.stringify(currentCredentials)); } catch (ignore) { }
                     return currentCredentials;
                 }
             } catch (e) {
@@ -1611,8 +1618,80 @@
         }
 
         function clearCredentials() {
-            localStorage.removeItem('userCredentials');
+            localStorage.removeItem('userData');
+            // Also remove old key just in case
+            try { localStorage.removeItem('userCredentials'); } catch (e) { /* ignore */ }
             currentCredentials = null;
+            clearUserMetadataStorage();
+        }
+
+        // Note: user metadata is merged into `userData` object in localStorage
+
+        function loadUserMetadata() {
+            if (!currentCredentials || !currentCredentials.email) {
+                currentUserMetadata = null;
+                return null;
+            }
+            // Use the metadata merged into currentCredentials
+            const meta = {
+                activeSet: currentCredentials.activeSet || '',
+                availableSets: Array.isArray(currentCredentials.availableSets) ? currentCredentials.availableSets.slice() : [],
+                adminEmail: (currentUserMetadata && currentUserMetadata.adminEmail) ? currentUserMetadata.adminEmail : 'administrator'
+            };
+            currentUserMetadata = { ...meta };
+            return { ...meta };
+        }
+
+        function saveUserMetadata(partial) {
+            if (!currentCredentials || !currentCredentials.email) return;
+            const existing = loadUserMetadata() || {
+                activeSet: currentCredentials.activeSet || '',
+                availableSets: [],
+                adminEmail: 'administrator'
+            };
+            const next = {
+                activeSet: (partial && partial.activeSet !== undefined)
+                    ? partial.activeSet
+                    : existing.activeSet,
+                availableSets: (partial && Array.isArray(partial.availableSets))
+                    ? partial.availableSets.slice()
+                    : existing.availableSets
+                // adminEmail intentionally not persisted into localStorage
+            };
+            // Mirror global settings into the credentials if present
+            if (partial && partial.ThemeLight !== undefined) next.ThemeLight = partial.ThemeLight;
+            if (partial && partial.AudioAutoPlay !== undefined) next.AudioAutoPlay = partial.AudioAutoPlay;
+            if (partial && partial.PlaybackSpeed !== undefined) next.PlaybackSpeed = partial.PlaybackSpeed;
+            // Save back into currentCredentials for single-key storage
+            try {
+                currentCredentials.activeSet = next.activeSet;
+                currentCredentials.availableSets = Array.isArray(next.availableSets) ? next.availableSets.slice() : [];
+                if (next.ThemeLight !== undefined) currentCredentials.ThemeLight = next.ThemeLight;
+                if (next.AudioAutoPlay !== undefined) currentCredentials.AudioAutoPlay = next.AudioAutoPlay;
+                if (next.PlaybackSpeed !== undefined) currentCredentials.PlaybackSpeed = next.PlaybackSpeed;
+                // persist updated credentials object under 'userData' and ensure defaults
+                ensureGlobalDefaults(currentCredentials);
+                localStorage.setItem('userData', JSON.stringify(currentCredentials));
+                // update in-memory metadata only (do not persist adminEmail)
+                currentUserMetadata = { activeSet: next.activeSet, availableSets: next.availableSets || [], adminEmail: existing.adminEmail };
+            } catch (e) {
+                log_('Failed to save user metadata:', e);
+            }
+        }
+
+        function clearUserMetadataStorage() {
+            // Remove metadata fields from the credentials stored under 'userData'
+            try {
+                if (currentCredentials) {
+                    delete currentCredentials.activeSet;
+                    delete currentCredentials.availableSets;
+                    delete currentCredentials.ThemeLight;
+                    delete currentCredentials.AudioAutoPlay;
+                    delete currentCredentials.PlaybackSpeed;
+                    localStorage.setItem('userData', JSON.stringify(currentCredentials));
+                }
+            } catch (e) { /* ignore */ }
+            currentUserMetadata = null;
         }
 
         function showLoginModal() {
@@ -1678,6 +1757,13 @@
             try {
                 const result = await service.getSession({ userId: email, password: password });
                 if (result.success !== false) {
+                    const prevEmail = currentCredentials && currentCredentials.email
+                        ? String(currentCredentials.email).toLowerCase()
+                        : null;
+                    const nextEmail = String(email).toLowerCase();
+                    if (!prevEmail || prevEmail !== nextEmail) {
+                        await clearClientStorage();
+                    }
                     saveCredentials(email, password);
                     hideLoginModal();
                     return result;
@@ -1713,6 +1799,12 @@
         const SaveQueue = {
             queue: [],
             processing: false,
+
+            clear() {
+                this.queue = [];
+                this.processing = false;
+                localStorage.removeItem('saveQueue');
+            },
 
             add(saveType, data) {
                 // Capture credentials NOW to avoid null reference when process() runs later
@@ -1775,26 +1867,18 @@
                         // Update local IndexedDB cache (DeckCache) so cached session
                         // reflects the newly-saved settings/progress immediately.
                         try {
-                            if (typeof DeckCache !== 'undefined' && currentCredentials && currentCredentials.email) {
-                                const cacheKey = `${currentCredentials.email}_${currentCredentials.setName || 'default'}`;
-
-                                // Build a lightweight session object compatible with the cached shape
+                            if (typeof DeckCache !== 'undefined') {
+                                const activeSetName = payload?.activeSet || creds.activeSet || currentCredentials?.activeSet;
+                                const cacheKey = getDeckCacheKey(activeSetName);
                                 const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
-                                const sess = {
-                                    success: true,
-                                    userId: String(currentCredentials.email),
-                                    activeSet: payload?.activeSet || creds.activeSet || '',
-                                    availableSets: payload?.availableSets || [],
-                                    setSettings: payload?.setSettings || {},
+                                const cachedSession = {
                                     cards: Array.isArray(payload?.items) ? payload.items.map(r => Array.isArray(r) ? r.slice(0, cardWidth) : []) : [],
-                                    userSettings: Array.isArray(settings) ? settings.map(r => Array.isArray(r) ? r.slice() : []) : (payload?.settings || []),
+                                    userSettings: Array.isArray(settings) ? stripGlobalSettingsFromArray(settings.map(r => Array.isArray(r) ? r.slice() : [])) : stripGlobalSettingsFromArray(payload?.settings || []),
                                     userProgress: Array.isArray(payload?.items) ? payload.items.map(r => Array.isArray(r) ? r.slice(cardWidth) : []) : [],
-                                    studySetSchema: payload?.schema || {},
-                                    userProgressSchema: payload?.userProgressSchema || {},
-                                    adminEmail: payload?.adminEmail || ''
+                                    setSettings: payload?.setSettings || {}
                                 };
 
-                                DeckCache.set(cacheKey, sess).catch(e => log_('[DeckCache] set failed after save:', e));
+                                DeckCache.set(cacheKey, cachedSession).catch(e => log_('[DeckCache] set failed after save:', e));
                             }
                         } catch (e) {
                             log_('Failed to update local cache after save:', e);
@@ -1877,19 +1961,19 @@
         const serverImpl = {
             async getSession(arg) {
                 const t0 = performance.now();
-                console.log(`[PERF→FRONT] getSession START`);
+                log_(`[PERF→FRONT] getSession START`);
                 const payloadObj = { action: 'getSession', ...arg };
                 const sanitized = maskSensitiveFields(payloadObj);
-                console.log(`[FRONT→BACK] getSession payload`, sanitized);
+                log_(`[FRONT→BACK] getSession payload`, sanitized);
                 const payload = JSON.stringify(payloadObj);
-                console.log(`[PERF→FRONT] JSON.stringify ${Math.round(performance.now() - t0)}ms`);
+                log_(`[PERF→FRONT] JSON.stringify ${Math.round(performance.now() - t0)}ms`);
                 const t2 = performance.now();
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: payload
                 });
-                console.log(`[PERF→FRONT] fetch() ${Math.round(performance.now() - t2)}ms status=${response.status}`);
+                log_(`[PERF→FRONT] fetch() ${Math.round(performance.now() - t2)}ms status=${response.status}`);
 
                 const contentType = (response.headers.get('Content-Type') || response.headers.get('content-type') || '').toLowerCase();
                 if (!contentType.includes('application/json')) {
@@ -1899,10 +1983,10 @@
                 }
                 try {
                     const result = await response.json();
-                    console.log(`[FRONT←BACK] getSession response`, summarizeResult(result));
+                    log_(`[FRONT←BACK] getSession response`, summarizeResult(result));
                     const size = JSON.stringify(result).length;
-                    console.log(`[PERF→FRONT] getSession TOTAL ${Math.round(performance.now() - t0)}ms`);
-                    console.log(`[FRONT←BACK] getSession ${(size / 1024).toFixed(1)}KB ${Math.round(performance.now() - t0)}ms`);
+                    log_(`[PERF→FRONT] getSession TOTAL ${Math.round(performance.now() - t0)}ms`);
+                    log_(`[FRONT←BACK] getSession ${(size / 1024).toFixed(1)}KB ${Math.round(performance.now() - t0)}ms`);
                     if (result && Array.isArray(result.debugLog) && result.debugLog.length) logBackendDebug(result.debugLog, 'getSession');
                     if (result === null || result === undefined) throw new Error('Server returned null');
                     return result;
@@ -1916,7 +2000,7 @@
             async saveSession(payload) {
                 const t0 = performance.now();
                 const sanitized = maskSensitiveFields(payload);
-                console.log(`[FRONT→BACK] saveSession payload`, sanitized);
+                log_(`[FRONT→BACK] saveSession payload`, sanitized);
                 const size = JSON.stringify(payload).length;
                 const response = await fetch(API_URL, {
                     method: 'POST',
@@ -1933,7 +2017,7 @@
                 }
                 try {
                     const result = await response.json();
-                    console.log(`[FRONT←BACK] saveSession response`, summarizeResult(result));
+                    log_(`[FRONT←BACK] saveSession response`, summarizeResult(result));
                     const answered = payload?.data ? `answered=${_lastSavedAnswerCount}` : '';
                     log_(`[FRONT→BACK] saveSession(${payload.saveType}) ${answered} ${(size / 1024).toFixed(1)}KB ${Math.round(performance.now() - t0)}ms`);
                     if (result && Array.isArray(result.debugLog) && result.debugLog.length) logBackendDebug(result.debugLog, 'saveSession');
@@ -1947,7 +2031,7 @@
 
             async changePassword(payload) {
                 const t0 = performance.now();
-                console.log(`[FRONT→BACK] changePassword payload`, maskSensitiveFields(payload));
+                log_(`[FRONT→BACK] changePassword payload`, maskSensitiveFields(payload));
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1963,7 +2047,7 @@
                 }
                 try {
                     const result = await response.json();
-                    console.log(`[FRONT←BACK] changePassword response`, summarizeResult(result));
+                    log_(`[FRONT←BACK] changePassword response`, summarizeResult(result));
                     log_(`[FRONT→BACK] changePassword ${(result && result.success) ? 'OK' : 'FAIL'} ${Math.round(performance.now() - t0)}ms`);
                     return result;
                 } catch (err) {
@@ -2055,20 +2139,6 @@
             });
         }
 
-        function parseSettingOptions_(raw) {
-            if (!raw) return [];
-            const t = String(raw).trim();
-            if (!t) return [];
-            if (t[0] === '{' || t[0] === '[') {
-                try {
-                    const j = JSON.parse(t);
-                    return Array.isArray(j) ? j : [j];
-                } catch (e) { /* fall through to pipe */ }
-            }
-            // Support escaping \| inside a value.
-            return t.split(/(?<!\\)\|/).map(s => s.replace(/\\\|/g, '|').trim()).filter(Boolean);
-        }
-
         function parseDue_(v) {
             if (!v) return 0;
             const d = new Date(v);
@@ -2090,37 +2160,15 @@
         }
 
 
-        function toIsoDateString_(val) {
-            if (!val) return '';
-            const str = String(val).trim();
-            // If already in YYYY-MM-DD format, return as-is
-            if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
-            // Otherwise try to parse and format
-            try {
-                const d = new Date(str);
-                if (isNaN(d.getTime())) return '';
-                const y = d.getUTCFullYear();
-                const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-                const day = String(d.getUTCDate()).padStart(2, '0');
-                return `${y}-${m}-${day}`;
-            } catch (e) {
-                return '';
-            }
-        }
-
-        let _audioSrc = '';
         let _audioEnabled = false;
-        let _audioAllowed = false;
         let _currentAudioUrl = '';
         let _audioRequestId = 0;
 
         function initAudioStateFromSettings() {
             try {
                 const val = getSetting('AudioAutoPlay');
-                _audioAllowed = (val === true || val === 'true');
-                _audioEnabled = _audioAllowed;
+                _audioEnabled = (val === true || val === 'true');
             } catch (e) {
-                _audioAllowed = true;
                 _audioEnabled = true;
             }
         }
@@ -2178,7 +2226,6 @@
 
                 await audio.play();
                 log_('[Audio] Playing successfully');
-                _audioSrc = url;
 
                 return true;
             } catch (e) {
@@ -2320,16 +2367,20 @@
         }
 
         let settingsDraft = null;
+        // Store original theme when opening settings so that Cancel can revert preview
+        let _themePreviewOriginal = null;
         // 2025-11-07 13:40 IDT — Settings as matrix: render using schema indices
         const THEME_SETTING_NAME = 'ThemeLight';
 
-        function applyTheme() {
+        function applyTheme(val) {
+            // Accept an explicit value to preview a change while editing settings
             const body = document.body;
             if (!body) return;
             let isLight = true;
             try {
-                const val = getSetting(THEME_SETTING_NAME);
-                isLight = val === true || val === 'true';
+                let v = val;
+                if (v === undefined) v = getSetting(THEME_SETTING_NAME);
+                isLight = v === true || v === 'true';
             } catch (e) {
                 isLight = true;
             }
@@ -2418,7 +2469,8 @@
                             r[1] = ctrl.value;
                         }
                         if (name === 'ThemeLight') {
-                            applyTheme();
+                            // Pass explicit value so the preview updates immediately while editing
+                            applyTheme(r[1]);
                         }
                         if (name === 'TestDueDate') {
                             syncAutoNewRate();
@@ -2516,13 +2568,8 @@
                         }
                     }
 
-                    const meta = document.createElement('div');
-                    meta.className = 'meta';
-                    meta.textContent = '';
-
                     grid.appendChild(label);
                     grid.appendChild(ctrlWrap);
-                    grid.appendChild(meta);
 
                     // Show current numeric value for PlaybackSpeed ABOVE the slider and centered
                     if (name === 'PlaybackSpeed' && ctrl) {
@@ -2591,6 +2638,13 @@
                 Array.isArray(r) && String(r[0]) === String(name)
             );
             if (!row || row[1] == null) {
+                // Fallback to credentials (persisted global settings) if present
+                try {
+                    if (currentCredentials && currentCredentials[name] !== undefined) {
+                        const val = currentCredentials[name];
+                        return asNumber ? Number(val) : String(val).trim();
+                    }
+                } catch (e) { /* ignore */ }
                 throw new Error(`Missing setting: ${name}`);
             }
             const raw = row[1];
@@ -2625,7 +2679,7 @@
             }
 
             testState = {
-                setName: payload.activeSet || 'Test',
+                activeSet: payload.activeSet || 'Test',
                 shuffledIndices: shuffleArray(indices),
                 currentIndex: 0,
                 score: 0,
@@ -2683,7 +2737,7 @@
             // Update progress - show number of questions answered so far
             const sb = $('statusBarText');
             const percentage = testState.currentIndex > 0 ? Math.round((testState.score / testState.currentIndex) * 100) : 0;
-            const deckName = testState.setName || '';
+            const deckName = testState.activeSet || '';
             if (sb) {
                 if (deckName) {
                     sb.innerHTML = `<span dir="auto">${deckName}</span><span dir="ltr"> - Questions: ${testState.currentIndex} · Score: ${percentage}%</span>`;
@@ -2774,7 +2828,7 @@
             testState.currentIndex++;
             const sb = $('statusBarText');
             const percentage = Math.round((testState.score / testState.currentIndex) * 100);
-            const deckName = testState.setName || '';
+            const deckName = testState.activeSet || '';
             if (sb) {
                 if (deckName) {
                     sb.innerHTML = `<span dir="auto">${deckName}</span><span dir="ltr"> - Questions: ${testState.currentIndex} · Score: ${percentage}%</span>`;
@@ -2835,7 +2889,7 @@
                 saveType: 'testResult',
                 testData: {
                     testDateTime,
-                    setName: testState.setName,
+                    setName: testState.activeSet,
                     questionsAnswered,
                     percentage,
                     testSessionId
@@ -2909,7 +2963,7 @@
             const sessionArg = {
                 userId: currentCredentials.email,
                 password: currentCredentials.password,
-                setName: currentCredentials.setName || null
+                setName: currentCredentials.activeSet || null
             };
             const sess = await service.getSession(sessionArg);
             log_('[loadSession] Received session success=' + sess.success);
@@ -2924,14 +2978,38 @@
                 throw new Error(sess.error || 'Failed to load session');
             }
 
+            // Merge server-provided credentials (includes global settings) into local saved credentials
+            try {
+                if (sess && sess.userData) {
+                    const remoteCreds = sess.userData || {};
+                    currentCredentials = currentCredentials || { email: sess.userId, password: currentCredentials?.password || '' };
+                    // copy known keys (ThemeLight, AudioAutoPlay, PlaybackSpeed, activeSet, availableSets)
+                    if (remoteCreds.ThemeLight !== undefined) currentCredentials.ThemeLight = remoteCreds.ThemeLight;
+                    if (remoteCreds.AudioAutoPlay !== undefined) currentCredentials.AudioAutoPlay = remoteCreds.AudioAutoPlay;
+                    if (remoteCreds.PlaybackSpeed !== undefined) currentCredentials.PlaybackSpeed = remoteCreds.PlaybackSpeed;
+                    // Ensure we have defaults for any missing global keys
+                    ensureGlobalDefaults(currentCredentials);
+                    // persist merged credentials
+                    try { localStorage.setItem('userData', JSON.stringify(currentCredentials)); } catch (e) { log_('Failed to persist merged userData', e); }
+                }
+            } catch (e) {
+                log_('Failed to merge server credentials into local credentials:', e);
+            }
             return sess;
         }
 
         function setupUserDisplay(sess) {
             const userIdEl = $('userIdDisplay');
-            if (userIdEl && sess.userId) {
+            if (!userIdEl) return;
+            if (sess && sess.userId) {
                 userIdEl.textContent = sess.userId;
+                return;
             }
+            if (currentCredentials && currentCredentials.email) {
+                userIdEl.textContent = currentCredentials.email;
+                return;
+            }
+            userIdEl.textContent = '';
         }
 
         function populateStudySetMenu(sess) {
@@ -2965,6 +3043,10 @@
                     check.textContent = '✓';
                     item.appendChild(check);
                 }
+                const arrow = document.createElement('span');
+                arrow.className = 'menu-arrow';
+                arrow.textContent = '▶';
+                item.appendChild(arrow);
 
                 item.onclick = async () => {
                     if (setName === sess.activeSet) return;
@@ -3117,14 +3199,43 @@
                     sessionStatusText: '',
                     _armed: false
                 },
+                userData: ensureGlobalDefaults(sess.userData || (function () {
+                    const obj = { email: sess.userId };
+                    try {
+                        for (const r of (sess.userSettings || [])) {
+                            if (!Array.isArray(r) || !r.length) continue;
+                            const k = String(r[0] || '').trim();
+                            if (k === 'ThemeLight' || k === 'AudioAutoPlay' || k === 'PlaybackSpeed') obj[k] = r[1];
+                        }
+                    } catch (e) { /* ignore */ }
+                    return obj;
+                })()),
                 _isMock: !!isMock
             };
         }
 
-        // IndexedDB cache wrapper
+        function getDeckCacheKey(setNameOverride = null) {
+            const explicit = (setNameOverride !== null && setNameOverride !== undefined)
+                ? String(setNameOverride).trim()
+                : '';
+            if (explicit) return explicit;
+            const stored = currentCredentials && currentCredentials.activeSet
+                ? String(currentCredentials.activeSet).trim()
+                : '';
+            return stored || 'default';
+        }
+
+        // IndexedDB cache: stores per-deck data
+        // Structure per deck (keyed by setId):
+        // {
+        //   cards: [[term, image, band, def, dist1, dist2, dist3], ...],
+        //   userProgress: [[due, step, reps, lapses, suspended, tags], ...],
+        //   setSettings: {AudioEnabled, AudioOnly, Ladder, Lang, ...},
+        //   userSettings: [['UserID', email], ['NewItemsPerDay', 4], ...]
+        // }
         const DeckCache = {
             dbName: 'fsrs_decks',
-            storeName: 'sessions',
+            storeName: 'studySets',
             db: null,
 
             async init() {
@@ -3145,13 +3256,13 @@
                 });
             },
 
-            async get(key) {
+            async get(setId) {
                 try {
                     await this.init();
                     return new Promise((resolve, reject) => {
                         const tx = this.db.transaction(this.storeName, 'readonly');
                         const store = tx.objectStore(this.storeName);
-                        const request = store.get(key);
+                        const request = store.get(setId);
                         request.onsuccess = () => resolve(request.result);
                         request.onerror = () => reject(request.error);
                     });
@@ -3161,21 +3272,103 @@
                 }
             },
 
-            async set(key, value) {
+            async set(setId, deckData) {
                 try {
                     await this.init();
                     return new Promise((resolve, reject) => {
                         const tx = this.db.transaction(this.storeName, 'readwrite');
                         const store = tx.objectStore(this.storeName);
-                        const request = store.put(value, key);
+                        const request = store.put(deckData, setId);
                         request.onsuccess = () => resolve();
                         request.onerror = () => reject(request.error);
                     });
                 } catch (e) {
                     log_('[DeckCache] set failed:', e);
                 }
+            },
+
+            async clearAll() {
+                try {
+                    await this.init();
+                    return new Promise((resolve, reject) => {
+                        const tx = this.db.transaction(this.storeName, 'readwrite');
+                        const store = tx.objectStore(this.storeName);
+                        const request = store.clear();
+                        request.onsuccess = () => {
+                            try {
+                                this.db.close();
+                            } catch (closeErr) {
+                                log_('[DeckCache] close failed during clear:', closeErr);
+                            }
+                            this.db = null;
+                            resolve();
+                        };
+                        request.onerror = () => reject(request.error);
+                    });
+                } catch (e) {
+                    log_('[DeckCache] clearAll failed:', e);
+                }
             }
         };
+
+        // Helper to remove global settings from userSettings array for storage in IndexedDB.
+        const GLOBAL_SETTING_NAMES = ['ThemeLight', 'AudioAutoPlay', 'PlaybackSpeed'];
+        // Default values for per-user global settings persisted into localStorage.userData
+        const DEFAULT_GLOBAL_SETTINGS = {
+            ThemeLight: true,
+            AudioAutoPlay: true,
+            PlaybackSpeed: 1.5
+        };
+
+        function ensureGlobalDefaults(creds) {
+            if (!creds || typeof creds !== 'object') creds = {};
+            if (creds.ThemeLight === undefined) creds.ThemeLight = DEFAULT_GLOBAL_SETTINGS.ThemeLight;
+            if (creds.AudioAutoPlay === undefined) creds.AudioAutoPlay = DEFAULT_GLOBAL_SETTINGS.AudioAutoPlay;
+            if (creds.PlaybackSpeed === undefined || creds.PlaybackSpeed === null) creds.PlaybackSpeed = DEFAULT_GLOBAL_SETTINGS.PlaybackSpeed;
+            return creds;
+        }
+        function stripGlobalSettingsFromArray(arr) {
+            if (!Array.isArray(arr)) return [];
+            try {
+                return arr.filter(r => !(Array.isArray(r) && GLOBAL_SETTING_NAMES.includes(String(r[0]))));
+            } catch (e) { return arr; }
+        }
+
+        function buildCachedSession(deckData, cacheKeyHint = '') {
+            const meta = loadUserMetadata();
+            const activeSetName = (meta && meta.activeSet)
+                ? meta.activeSet
+                : (cacheKeyHint || currentCredentials?.activeSet || '');
+            return {
+                activeSet: activeSetName,
+                availableSets: Array.isArray(meta?.availableSets) ? meta.availableSets.slice() : [],
+                // do not persist adminEmail in cached session; use server-provided value when available
+                cards: Array.isArray(deckData?.cards) ? deckData.cards : [],
+                userSettings: Array.isArray(deckData?.userSettings) ? stripGlobalSettingsFromArray(deckData.userSettings) : [],
+                userData: (function () {
+                    if (deckData && deckData.userData) return ensureGlobalDefaults(deckData.userData);
+                    if (currentCredentials) return ensureGlobalDefaults({ email: currentCredentials.email, ThemeLight: currentCredentials.ThemeLight, AudioAutoPlay: currentCredentials.AudioAutoPlay, PlaybackSpeed: currentCredentials.PlaybackSpeed });
+                    return null;
+                })(),
+                userProgress: Array.isArray(deckData?.userProgress) ? deckData.userProgress : [],
+                setSettings: deckData?.setSettings || {},
+                studySetSchema: STUDY_SET_SCHEMA,
+                userProgressSchema: USER_PROGRESS_SCHEMA
+            };
+        }
+
+
+
+        async function clearClientStorage() {
+            SaveQueue.clear();
+            try {
+                await DeckCache.clearAll();
+            } catch (e) {
+                log_('[clearClientStorage] failed to wipe cache:', e);
+            }
+            clearUserMetadataStorage();
+            localStorage.clear();
+        }
 
         async function boot(cachedSession = null) {
             const t0 = performance.now();
@@ -3192,15 +3385,30 @@
             if (sb) sb.textContent = 'Loading...';
 
             // Try IndexedDB cache first
-            const cacheKey = `${currentCredentials.email}_${currentCredentials.setName || 'default'}`;
+            const cacheKey = getDeckCacheKey();
+            let cachedDeckData = null;
             let cachedSess = null;
 
             if (!cachedSession) {
                 try {
-                    cachedSess = await DeckCache.get(cacheKey);
-                    if (cachedSess) {
+                    cachedDeckData = await DeckCache.get(cacheKey);
+                    if (cachedDeckData) {
+                        cachedSess = buildCachedSession(cachedDeckData, cacheKey);
                         log_('[boot] Found cached session in IndexedDB, using immediately');
+                        // Merge cached userData into local credentials so theme/audio can apply early
+                        try {
+                            if (cachedSess.userData) {
+                                currentCredentials = currentCredentials || {};
+                                if (cachedSess.userData.email) currentCredentials.email = cachedSess.userData.email;
+                                if (cachedSess.userData.ThemeLight !== undefined) currentCredentials.ThemeLight = cachedSess.userData.ThemeLight;
+                                if (cachedSess.userData.AudioAutoPlay !== undefined) currentCredentials.AudioAutoPlay = cachedSess.userData.AudioAutoPlay;
+                                if (cachedSess.userData.PlaybackSpeed !== undefined) currentCredentials.PlaybackSpeed = cachedSess.userData.PlaybackSpeed;
+                                try { ensureGlobalDefaults(currentCredentials); localStorage.setItem('userData', JSON.stringify(currentCredentials)); } catch (e) { log_('Failed to persist cached userData', e); }
+                            }
+                        } catch (e) { /* ignore */ }
                         if (sb) sb.textContent = 'Loading cached data...';
+                        // Apply theme & audio state immediately using cached credentials
+                        try { applyTheme(); initAudioStateFromSettings(); } catch (e) { /* ignore */ }
                     }
                 } catch (e) {
                     log_('[boot] Cache read failed:', e);
@@ -3210,25 +3418,35 @@
             try {
                 // If we have cached data, show it immediately
                 if (cachedSess) {
-                    const sess = cachedSess;
-                    setupUserDisplay(sess);
-                    populateStudySetMenu(sess);
+                    if (currentCredentials && cachedSess.activeSet && currentCredentials.activeSet !== cachedSess.activeSet) {
+                        saveCredentials(currentCredentials.email, currentCredentials.password, cachedSess.activeSet);
+                    }
+                    setupUserDisplay(cachedSess);
+                    populateStudySetMenu(cachedSess);
 
-                    if (!sess.activeSet) {
-                        handleNoActiveSet(sess);
+                    if (!cachedSess.activeSet) {
+                        handleNoActiveSet(cachedSess);
                         return;
                     }
 
-                    enableMenuItems(sess);
+                    enableMenuItems(cachedSess);
 
-                    if (!Array.isArray(sess.cards) || !Array.isArray(sess.userProgress)) {
+                    if (!Array.isArray(cachedSess.cards) || !Array.isArray(cachedSess.userProgress)) {
                         throw new Error('Cached session is invalid');
                     }
 
-                    payload = buildPayload(sess);
+                    payload = buildPayload(cachedSess);
                     settings = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
                     renderSettingsUI({ settings });
-                    applyTheme();
+                    // Preview the theme using the draft (if available) rather than current stored value
+                    try {
+                        // Save the current applied theme for potential revert
+                        _themePreviewOriginal = (function () {
+                            try { return getSetting(THEME_SETTING_NAME); } catch (e) { return currentCredentials?.ThemeLight; }
+                        })();
+                        const themeRow = (settingsDraft || []).find(r => Array.isArray(r) && String(r[0]) === 'ThemeLight');
+                        applyTheme(themeRow ? themeRow[1] : undefined);
+                    } catch (e) { _themePreviewOriginal = (document.body && document.body.dataset && document.body.dataset.theme === 'light'); applyTheme(); }
                     autoAdjustNewItemsPerDay();
 
                     $('quizArea').classList.remove('hidden');
@@ -3243,6 +3461,19 @@
                 // Always fetch fresh data in background
                 const sess = cachedSession || (log_('boot: calling service.getSession()'), await loadSession());
 
+                if (sess && typeof sess === 'object') {
+                    if (currentCredentials && sess.activeSet && currentCredentials.activeSet !== sess.activeSet) {
+                        saveCredentials(currentCredentials.email, currentCredentials.password, sess.activeSet);
+                    }
+                    // Persist only activeSet & availableSets; keep adminEmail in-memory only
+                    saveUserMetadata({
+                        activeSet: sess.activeSet,
+                        availableSets: sess.availableSets
+                    });
+                    // Update in-memory adminEmail value for UI display, do not persist it
+                    try { currentUserMetadata = currentUserMetadata || { activeSet: '', availableSets: [], adminEmail: 'administrator' }; currentUserMetadata.adminEmail = sess.adminEmail || currentUserMetadata.adminEmail || 'administrator'; } catch (e) { /* ignore */ }
+                }
+
                 // Display retry info if present
                 if (sess.retryInfo) {
                     log_('[boot] ' + sess.retryInfo);
@@ -3253,13 +3484,22 @@
                 }
 
                 // Update cache with fresh data (IndexedDB)
-                DeckCache.set(cacheKey, sess).catch(e => log_('[boot] Cache write failed:', e));
+                const freshKey = getDeckCacheKey(sess.activeSet);
+                const deckDataForCache = {
+                    cards: Array.isArray(sess.cards) ? sess.cards.map(r => Array.isArray(r) ? r.slice() : []) : [],
+                    userSettings: Array.isArray(sess.userSettings) ? stripGlobalSettingsFromArray(sess.userSettings.map(r => Array.isArray(r) ? r.slice() : [])) : [],
+                    userProgress: Array.isArray(sess.userProgress) ? sess.userProgress.map(r => Array.isArray(r) ? r.slice() : []) : [],
+                    setSettings: sess.setSettings || {},
+                    // userData intentionally not persisted to IndexedDB (global user settings are volatile/local)
+
+                };
+                DeckCache.set(freshKey, deckDataForCache).catch(e => log_('[boot] Cache write failed:', e));
                 log_('[boot] Cache updated with fresh data');
 
                 // If we already showed cached data, check if anything changed
-                if (cachedSess) {
-                    const progressChanged = JSON.stringify(cachedSess.userProgress) !== JSON.stringify(sess.userProgress);
-                    const settingsChanged = JSON.stringify(cachedSess.userSettings) !== JSON.stringify(sess.userSettings);
+                if (cachedDeckData) {
+                    const progressChanged = JSON.stringify(cachedDeckData.userProgress) !== JSON.stringify(sess.userProgress);
+                    const settingsChanged = JSON.stringify(cachedDeckData.userSettings) !== JSON.stringify(stripGlobalSettingsFromArray(sess.userSettings || []));
                     if (progressChanged || settingsChanged) {
                         log_('[boot] Data changed (progress=' + progressChanged + ', settings=' + settingsChanged + '), updating UI');
                         if (sb) sb.textContent = 'Updated from server';
@@ -3517,7 +3757,13 @@
             bands.forEach(band => {
                 const item = document.createElement('div');
                 item.className = 'submenu-item';
-                item.textContent = `${band} (${bandCounts[band]})`;
+                const label = document.createElement('span');
+                label.textContent = `${band} (${bandCounts[band]})`;
+                item.appendChild(label);
+                const arrow = document.createElement('span');
+                arrow.className = 'menu-arrow';
+                arrow.textContent = '▶';
+                item.appendChild(arrow);
                 item.onclick = () => {
                     if (menuDropdown) menuDropdown.hidden = true;
                     if (suspendSubmenu) suspendSubmenu.hidden = true;
@@ -3529,7 +3775,13 @@
             // Add "All Cards" option
             const allItem = document.createElement('div');
             allItem.className = 'submenu-item';
-            allItem.textContent = `All Cards (${payload.items.length})`;
+            const allLabel = document.createElement('span');
+            allLabel.textContent = `All Cards (${payload.items.length})`;
+            allItem.appendChild(allLabel);
+            const allArrow = document.createElement('span');
+            allArrow.className = 'menu-arrow';
+            allArrow.textContent = '▶';
+            allItem.appendChild(allArrow);
             allItem.onclick = () => {
                 if (menuDropdown) menuDropdown.hidden = true;
                 if (suspendSubmenu) suspendSubmenu.hidden = true;
@@ -4008,12 +4260,10 @@
             const newSettings = Array.isArray(settingsDraft)
                 ? settingsDraft.map(r => Array.isArray(r) ? r.slice() : [])
                 : [];
-            settings = newSettings.map(r => Array.isArray(r) ? r.slice() : []);
+            const draftCopy = newSettings.map(r => Array.isArray(r) ? r.slice() : []);
             settingsDraft = null;
             if (modalEl) modalEl.hidden = true;
             setProgress();
-            applyTheme();
-            initAudioStateFromSettings();
 
             // Re-render current card if one is showing
             if (payload && payload.state && payload.state.currentIndex >= 0) {
@@ -4021,10 +4271,54 @@
             }
 
             // Async save with optimistic UI
-            SaveQueue.add('settings', {
-                saveType: 'settings',
-                data: settings
-            });
+            try {
+                if (settingsViewMode === 'user') {
+                    // Persist only user preferences into credentials (do not overwrite deck 'settings')
+                    if (!currentCredentials) currentCredentials = { email: currentCredentials?.email, password: currentCredentials?.password };
+                    for (const r of draftCopy) {
+                        if (!Array.isArray(r) || !r.length) continue;
+                        const name = String(r[0] || '').trim();
+                        const value = r[1];
+                        if (name === 'ThemeLight' && value !== undefined) currentCredentials.ThemeLight = value;
+                        if (name === 'AudioAutoPlay' && value !== undefined) currentCredentials.AudioAutoPlay = value;
+                        if (name === 'PlaybackSpeed' && value !== undefined) currentCredentials.PlaybackSpeed = value;
+                    }
+                    try { ensureGlobalDefaults(currentCredentials); localStorage.setItem('userData', JSON.stringify(currentCredentials)); } catch (e) { log_('Failed to persist credentials after settings save', e); }
+
+                    // Save to server as settings payload so server-side writes global settings to Users sheet
+                    SaveQueue.add('settings', {
+                        saveType: 'settings',
+                        data: draftCopy
+                    });
+                } else {
+                    // Deck-level settings
+                    settings = draftCopy.map(r => Array.isArray(r) ? r.slice() : []);
+                    // Update any global keys mirrored in currentCredentials
+                    try {
+                        if (!currentCredentials) currentCredentials = { email: currentCredentials?.email, password: currentCredentials?.password };
+                        for (const r of settings) {
+                            if (!Array.isArray(r) || !r.length) continue;
+                            const name = String(r[0] || '').trim();
+                            const value = r[1];
+                            if (name === 'ThemeLight' && value !== undefined) currentCredentials.ThemeLight = value;
+                            if (name === 'AudioAutoPlay' && value !== undefined) currentCredentials.AudioAutoPlay = value;
+                            if (name === 'PlaybackSpeed' && value !== undefined) currentCredentials.PlaybackSpeed = value;
+                        }
+                        try { ensureGlobalDefaults(currentCredentials); localStorage.setItem('userData', JSON.stringify(currentCredentials)); } catch (e) { log_('Failed to persist credentials after settings save', e); }
+                    } catch (e) { /* ignore */ }
+
+                    SaveQueue.add('settings', {
+                        saveType: 'settings',
+                        data: settings
+                    });
+                }
+            } catch (e) { log_('Failed to process settings save', e); }
+
+            // Now that we've persisted settings into credentials and/or deck settings,
+            // re-apply theme and audio state to reflect saved values (not just previewed ones)
+            try { applyTheme(); } catch (e) { log_('Failed to apply theme after save', e); }
+            try { initAudioStateFromSettings(); } catch (e) { log_('Failed to init audio state after save', e); }
+            try { _themePreviewOriginal = null; } catch (e) { /* ignore */ }
         }
 
 
@@ -4130,6 +4424,7 @@
             const closeAllSubmenus = () => {
                 if (studySetSubmenu) studySetSubmenu.hidden = true;
                 if (suspendSubmenu) suspendSubmenu.hidden = true;
+                if (settingsOptionsSubmenu) settingsOptionsSubmenu.hidden = true;
             };
 
             // Menu item handlers
@@ -4137,6 +4432,29 @@
             const testModeMenuItem = $('testModeMenuItem');
             const suspendMenuItem = $('suspendMenuItem');
             const settingsMenuItem = $('settingsMenuItem');
+            const settingsOptionsSubmenu = $('settingsOptionsSubmenu');
+            const setSettingsOption = $('setSettingsOption');
+            const userPreferencesOption = $('userPreferencesOption');
+            // settingsViewMode is declared globally; don't redeclare here
+
+            function positionSubmenuAtMenuItem(submenu, menuItem) {
+                if (!submenu || !menuItem || !menuDropdown) return;
+                try {
+                    // Ensure submenu is visible so getBoundingClientRect() returns dimensions
+                    submenu.hidden = false;
+                    const menuRect = menuDropdown.getBoundingClientRect();
+                    const itemRect = menuItem.getBoundingClientRect();
+                    const left = Math.min(Math.max(menuRect.right + 6, 8), window.innerWidth - 160);
+                    // position submenu roughly aligned with the clicked menu item vertically
+                    let top = itemRect.top - 6;
+                    // Avoid going off-screen vertically
+                    const maxTop = Math.max(8, window.innerHeight - (submenu.getBoundingClientRect().height || 200) - 8);
+                    if (top > maxTop) top = maxTop;
+                    if (top < 8) top = 8;
+                    submenu.style.left = left + 'px';
+                    submenu.style.top = top + 'px';
+                } catch (e) { /* ignore positioning errors */ }
+            }
 
             if (studySetMenuItem && studySetSubmenu) {
                 studySetMenuItem.addEventListener('click', (e) => {
@@ -4149,7 +4467,7 @@
                         return;
                     }
                     closeAllSubmenus();
-                    studySetSubmenu.hidden = false;
+                    positionSubmenuAtMenuItem(studySetSubmenu, studySetMenuItem);
                 });
             }
 
@@ -4158,7 +4476,7 @@
                     e.stopPropagation();
                     populateSuspendBands();
                     closeAllSubmenus();
-                    suspendSubmenu.hidden = false;
+                    positionSubmenuAtMenuItem(suspendSubmenu, suspendMenuItem);
                 });
             }
 
@@ -4186,13 +4504,88 @@
             if (settingsMenuItem) {
                 settingsMenuItem.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    if (menuDropdown) menuDropdown.hidden = true;
+                    // Do NOT hide the main menu; open the right-side submenu next to it (like Study Set)
                     closeAllSubmenus();
-
-                    settingsDraft = settings.map(r => Array.isArray(r) ? r.slice() : []);
+                    if (settingsOptionsSubmenu) {
+                        // Position submenu next to the clicked menu item
+                        positionSubmenuAtMenuItem(settingsOptionsSubmenu, settingsMenuItem);
+                    }
+                });
+            }
+            if (setSettingsOption) {
+                setSettingsOption.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    // show deck-level settings (from IndexedDB if available, fallback to payload.settings)
+                    const active = payload?.activeSet || currentCredentials?.activeSet || getDeckCacheKey();
+                    let deckData = null;
+                    try {
+                        if (typeof DeckCache !== 'undefined' && active) {
+                            deckData = await DeckCache.get(active);
+                        }
+                    } catch (err) {
+                        log_('Failed to read deck cache:', err);
+                    }
+                    let draft = [];
+                    if (deckData && Array.isArray(deckData.userSettings) && deckData.userSettings.length) {
+                        draft = deckData.userSettings.map(r => Array.isArray(r) ? r.slice() : []);
+                    } else if (Array.isArray(payload?.settings)) {
+                        draft = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
+                    } else {
+                        draft = [];
+                    }
+                    // Remove UserID and global settings from deck-level settings
+                    draft = draft.filter(r => !Array.isArray(r) || String(r[0]) !== 'UserID');
+                    draft = stripGlobalSettingsFromArray(draft);
+                    settingsDraft = draft;
+                    settingsViewMode = 'set';
+                    // Capture original theme for revert on cancel
+                    try {
+                        _themePreviewOriginal = (function () {
+                            try { return getSetting(THEME_SETTING_NAME); } catch (e) { return currentCredentials?.ThemeLight; }
+                        })();
+                    } catch (e) { _themePreviewOriginal = (document.body && document.body.dataset && document.body.dataset.theme === 'light'); }
                     renderSettingsUI({ settings: settingsDraft });
-                    applyTheme();
+                    try { document.querySelector('#settingsWrap h3').textContent = 'Set Settings'; } catch (e) { /* ignore */ }
+                    try { $('settingsHint').textContent = `Deck: ${active}`; } catch (e) { /* ignore */ }
+                    try {
+                        const themeRow = (settingsDraft || []).find(r => Array.isArray(r) && String(r[0]) === 'ThemeLight');
+                        applyTheme(themeRow ? themeRow[1] : undefined);
+                    } catch (e) { applyTheme(); }
+                    // Close the main menu when opening the modal
+                    if (menuDropdown) menuDropdown.hidden = true;
                     $('settingsModal').hidden = false;
+                    if (settingsOptionsSubmenu) settingsOptionsSubmenu.hidden = true;
+                });
+            }
+
+            if (userPreferencesOption) {
+                userPreferencesOption.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    // show user preferences from localStorage.userData/currentCredentials
+                    const creds = ensureGlobalDefaults(currentCredentials || {});
+                    const draft = [
+                        ['ThemeLight', creds.ThemeLight],
+                        ['AudioAutoPlay', creds.AudioAutoPlay],
+                        ['PlaybackSpeed', creds.PlaybackSpeed]
+                    ];
+                    settingsDraft = draft.map(r => Array.isArray(r) ? r.slice() : []);
+                    settingsViewMode = 'user';
+                    renderSettingsUI({ settings: settingsDraft });
+                    try { document.querySelector('#settingsWrap h3').textContent = 'User Preferences'; } catch (e) { /* ignore */ }
+                    try { $('settingsHint').textContent = 'Preferences saved to your account'; } catch (e) { /* ignore */ }
+                    try {
+                        _themePreviewOriginal = (function () {
+                            try { return getSetting(THEME_SETTING_NAME); } catch (e) { return currentCredentials?.ThemeLight; }
+                        })();
+                    } catch (e) { _themePreviewOriginal = (document.body && document.body.dataset && document.body.dataset.theme === 'light'); }
+                    try {
+                        const themeRow = (settingsDraft || []).find(r => Array.isArray(r) && String(r[0]) === 'ThemeLight');
+                        applyTheme(themeRow ? themeRow[1] : undefined);
+                    } catch (e) { applyTheme(); }
+                    // Close the main menu when opening the modal
+                    if (menuDropdown) menuDropdown.hidden = true;
+                    $('settingsModal').hidden = false;
+                    if (settingsOptionsSubmenu) settingsOptionsSubmenu.hidden = true;
                 });
             }
 
@@ -4268,7 +4661,7 @@
                     cpSaveBtn.disabled = false;
                     if (resp && resp.success) {
                         // Update local stored credentials
-                        saveCredentials(currentCredentials.email, nw, currentCredentials.setName);
+                        saveCredentials(currentCredentials.email, nw, currentCredentials.activeSet);
                         if (changePasswordModal) changePasswordModal.hidden = true;
                         showToast('Password changed', 'info');
                     } else {
@@ -4373,6 +4766,9 @@
 
                     suspendModal.hidden = true;
 
+                    // Update stats to reflect suspended cards
+                    updateSessionStats();
+
                     // Async save
                     const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
                     const userProgress = payload.items.map(row => row.slice(cardWidth));
@@ -4397,6 +4793,8 @@
             if (btnCancel && modal) btnCancel.addEventListener('click', () => {
                 settingsDraft = null;
                 modal.hidden = true;
+                try { applyTheme(_themePreviewOriginal); } catch (e) { log_('Failed to revert theme on cancel', e); }
+                try { _themePreviewOriginal = null; } catch (e) { /* ignore */ }
             });
             if (btnSave && modal) btnSave.addEventListener('click', () => onSettingsSave(modal));
             const extraBtn = $('extraNewBtn');
@@ -4405,12 +4803,13 @@
             // Logout menu item handler
             const logoutMenuItem = $('logoutMenuItem');
             if (logoutMenuItem) {
-                logoutMenuItem.addEventListener('click', (e) => {
+                logoutMenuItem.addEventListener('click', async (e) => {
                     e.stopPropagation();
                     if (menuDropdown) menuDropdown.hidden = true;
                     closeAllSubmenus();
 
                     // Clear all state
+                    await clearClientStorage();
                     clearCredentials();
                     payload = null;
                     settings = [];
