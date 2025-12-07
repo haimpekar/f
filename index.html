@@ -1495,7 +1495,7 @@
         let settings = []; // active settings for this run (editable)
         let settingsViewMode = 'set'; // 'set' or 'user' - controls which settings panel is being edited
         let testState = null; // { activeSet, shuffledIndices, currentIndex, score, startTime, totalQuestions }
-        const DEBUG_MODE = false; // Set to true to enable debug logging
+        const DEBUG_MODE = true; // Set to true to enable debug logging
         function log_(...args) { if (DEBUG_MODE) console.log('[DEBUG]', ...args); }
         function logBackendDebug(entries, label) {
             if (!Array.isArray(entries) || entries.length === 0) return;
