@@ -1434,6 +1434,21 @@
             cancelBtn.onclick = cleanup;
         }
 
+        // Make menu-like divs keyboard focusable and activate on Enter/Space
+        function makeMenuItemFocusable(el) {
+            if (!el) return;
+            if (el.tabIndex !== 0) el.tabIndex = 0;
+            if (!el.getAttribute('role')) el.setAttribute('role', 'menuitem');
+            if (el.dataset && el.dataset.keyboardMenu === '1') return;
+            el.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    el.click();
+                }
+            });
+            if (el.dataset) el.dataset.keyboardMenu = '1';
+        }
+
         // Match code.gs.js structure
         const STUDY_SET_SCHEMA = {
             term: 0,
@@ -1477,22 +1492,37 @@
             Lang: 'he'
         };
 
-        const MOCK_USER_SETTINGS = [
+        // Deck-scoped settings (per set) exclude header row to mirror backend payload
+        const MOCK_DECK_USER_SETTINGS = [
             ['UserID', 'local@local.com'],
             ['NewItemsPerDay', 4],
             ['QuizMode', false],
-            ['TestDueDate', '2025-01-01'],
-            ['ThemeLight', false],
-            ['AudioAutoPlay', true],
-            ['PlaybackSpeed', 1.5]
+            ['TestDueDate', '2025-01-01']
         ];
 
-        const MOCK_CREDENTIALS = {
-            'local@local.com': 'local123',
-        };
+        // Global user preferences (stored in Users sheet, includes header row like backend)
+        const MOCK_USER_PREFERENCES = [
+            ['Setting', 'Value'],
+            ['UserID', 'local@local.com'],
+            ['Password', 'local123'],
+            ['ThemeLight', false],
+            ['AudioAutoPlay', true],
+            ['PlaybackSpeed', 4]
+        ];
+
+        function getMockUserId() {
+            const row = MOCK_USER_PREFERENCES.find(r => Array.isArray(r) && String(r[0]).toLowerCase() === 'userid');
+            return row ? String(row[1] || '').toLowerCase() : null;
+        }
+
+        function getMockPassword() {
+            const row = MOCK_USER_PREFERENCES.find(r => Array.isArray(r) && String(r[0]).toLowerCase() === 'password');
+            return row ? String(row[1] || '') : null;
+        }
 
         let payload = null; // { items, settings, schema, state }
         let settings = []; // active settings for this run (editable)
+        let userPreferences = []; // global user preferences (separate from deck settings)
         let settingsViewMode = 'set'; // 'set' or 'user' - controls which settings panel is being edited
         let testState = null; // { activeSet, shuffledIndices, currentIndex, score, startTime, totalQuestions }
         const DEBUG_MODE = true; // Set to true to enable debug logging
@@ -1512,8 +1542,8 @@
         const API_URL = 'https://fsrs.haim-pekar.workers.dev/';
 
         // Mode selection is based only on credentials.
-        // - If a call provides `userId` that exists in `MOCK_CREDENTIALS`, the call uses mock
-        // - Else if stored `currentCredentials.email` exists and matches `MOCK_CREDENTIALS`, use mock
+        // - If a call provides `userId` that matches the mock user, the call uses mock
+        // - Else if stored `currentCredentials.email` matches the mock user, use mock
         // - Otherwise the call uses the deployed server implementation
         // This removes any file:// or forceServer heuristics; mode is decided per-call by credentials.
         // user credentials stored under 'userData' includes metadata merged in: activeSet, availableSets, adminEmail
@@ -1770,12 +1800,7 @@
                 } else {
                     // Handle specific error messages from backend
                     let errorMsg;
-                    if (result.error === 'NEW_USER_REGISTERED') {
-                        const sets = result.availableSets || [];
-                        const adminEmail = result.adminEmail || 'administrator';
-                        errorMsg = `Account created! To start learning, contact administrator (${adminEmail}) to enable access to:\n\n` +
-                            sets.map(s => '• ' + s).join('\n');
-                    } else if (result.error === 'USER_NOT_FOUND') {
+                    if (result.error === 'USER_NOT_FOUND') {
                         errorMsg = 'User not found. Please contact administrator';
                     } else if (result.error === 'WRONG_PASSWORD') {
                         errorMsg = 'Incorrect password. Try again or contact administrator';
@@ -1821,11 +1846,17 @@
                     return;
                 }
 
-                // Deduplicate: remove older saves of same type
+                // Deduplicate: remove older saves of same type (distinguish deck vs user preferences)
+                const isPrefsSave = saveType === 'settings' && data && Array.isArray(data.userPreferences);
+                const isDeckSave = saveType === 'settings' && data && Array.isArray(data.deckSettings);
+                const typeKey = (saveType === 'settings')
+                    ? (isPrefsSave ? 'settings:userPreferences' : 'settings:deck')
+                    : saveType;
                 if (saveType === 'progress' || saveType === 'settings') {
-                    this.queue = this.queue.filter(item => item.saveType !== saveType);
+                    this.queue = this.queue.filter(item => item.typeKey !== typeKey);
                 }
-                const item = { saveType, data, credentials, attempts: 0, timestamp: Date.now() };
+
+                const item = { saveType, typeKey, data, credentials, attempts: 0, timestamp: Date.now() };
                 this.queue.push(item);
                 localStorage.setItem('saveQueue', JSON.stringify(this.queue));
                 this.process();
@@ -1874,6 +1905,7 @@
                                 const cachedSession = {
                                     cards: Array.isArray(payload?.items) ? payload.items.map(r => Array.isArray(r) ? r.slice(0, cardWidth) : []) : [],
                                     userSettings: Array.isArray(settings) ? stripGlobalSettingsFromArray(settings.map(r => Array.isArray(r) ? r.slice() : [])) : stripGlobalSettingsFromArray(payload?.settings || []),
+                                    userPreferences: Array.isArray(userPreferences) ? userPreferences.map(r => Array.isArray(r) ? r.slice() : []) : [],
                                     userProgress: Array.isArray(payload?.items) ? payload.items.map(r => Array.isArray(r) ? r.slice(cardWidth) : []) : [],
                                     setSettings: payload?.setSettings || {}
                                 };
@@ -1955,8 +1987,8 @@
 
         // API service: dynamically route calls to mock or real server based on
         // the provided or stored credentials. Decision rules:
-        // - If the call provides a `userId` and that email exists in `MOCK_CREDENTIALS` => mock
-        // - Else if stored `currentCredentials.email` exists and matches `MOCK_CREDENTIALS` => mock
+        // - If the call provides a `userId` matching the mock user => mock
+        // - Else if stored `currentCredentials.email` matches the mock user => mock
         // - Otherwise: server
         const serverImpl = {
             async getSession(arg) {
@@ -2064,14 +2096,16 @@
                 if (arg && arg.userId && arg.password) {
                     const email = String(arg.userId).toLowerCase();
                     const password = String(arg.password);
-                    if (!MOCK_CREDENTIALS[email]) return { success: false, error: 'USER_NOT_FOUND' };
-                    if (MOCK_CREDENTIALS[email] !== password) return { success: false, error: 'WRONG_PASSWORD' };
+                    const mockEmail = getMockUserId();
+                    const mockPwd = getMockPassword();
+                    if (!mockEmail || email !== mockEmail) return { success: false, error: 'USER_NOT_FOUND' };
+                    if (mockPwd !== null && password !== mockPwd) return { success: false, error: 'WRONG_PASSWORD' };
                 }
                 const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
                 const cards = MOCK_ITEMS;
                 const userProgress = MOCK_PROGRESS;
-                const userIdRow = MOCK_USER_SETTINGS.find(r => r[0] === 'UserID');
-                if (!userIdRow || !userIdRow[1]) return { success: false, error: 'MOCK_USER_SETTINGS missing UserID' };
+                const userIdRow = MOCK_DECK_USER_SETTINGS.find(r => r[0] === 'UserID');
+                if (!userIdRow || !userIdRow[1]) return { success: false, error: 'MOCK_DECK_USER_SETTINGS missing UserID' };
                 return {
                     success: true,
                     userId: userIdRow[1],
@@ -2079,14 +2113,54 @@
                     availableSets: ['TestSet'],
                     setSettings: MOCK_SET_SETTINGS,
                     cards: cards,
-                    userSettings: MOCK_USER_SETTINGS,
+                    userSettings: MOCK_DECK_USER_SETTINGS,
+                    userPreferences: MOCK_USER_PREFERENCES,
                     userProgress: userProgress,
                     studySetSchema: STUDY_SET_SCHEMA,
-                    userProgressSchema: USER_PROGRESS_SCHEMA
+                    userProgressSchema: USER_PROGRESS_SCHEMA,
+                    _isMock: true
                 };
             },
             async saveSession(payload) {
                 this._lastSaved = payload;
+                if (payload?.saveType === 'settings') {
+                    // Prefer new separated fields; fall back to legacy data array
+                    let deckSettings = Array.isArray(payload.deckSettings) ? payload.deckSettings : [];
+                    let globalSettings = Array.isArray(payload.userPreferences) ? payload.userPreferences : [];
+
+                    if ((!deckSettings.length && !globalSettings.length) && Array.isArray(payload.data)) {
+                        payload.data.forEach(row => {
+                            if (!Array.isArray(row) || row.length < 2) return;
+                            const name = String(row[0]);
+                            if (name === 'Setting' || name === 'UserID' || name === 'Password') return; // skip header/user rows
+                            if (name === 'ThemeLight' || name === 'AudioAutoPlay' || name === 'PlaybackSpeed') {
+                                globalSettings.push(row);
+                            } else {
+                                deckSettings.push(row);
+                            }
+                        });
+                    }
+
+                    // Update mock storage so subsequent mock getSession reflects the changes
+                    if (deckSettings.length) {
+                        deckSettings.forEach(r => {
+                            const name = String(r[0]);
+                            const idx = MOCK_DECK_USER_SETTINGS.findIndex(x => Array.isArray(x) && x[0] === name);
+                            if (idx >= 0) {
+                                MOCK_DECK_USER_SETTINGS[idx][1] = r[1];
+                            }
+                        });
+                    }
+                    if (globalSettings.length) {
+                        globalSettings.forEach(r => {
+                            const name = String(r[0]);
+                            const idx = MOCK_USER_PREFERENCES.findIndex(x => Array.isArray(x) && x[0] === name);
+                            if (idx >= 0) {
+                                MOCK_USER_PREFERENCES[idx][1] = r[1];
+                            }
+                        });
+                    }
+                }
                 return { success: true };
             },
             async changePassword(arg) {
@@ -2094,9 +2168,13 @@
                 const email = String(arg.userId).toLowerCase();
                 const cur = String(arg.currentPassword);
                 const nw = String(arg.newPassword);
-                if (!MOCK_CREDENTIALS[email]) return { success: false, error: 'USER_NOT_FOUND' };
-                if (MOCK_CREDENTIALS[email] !== cur) return { success: false, error: 'WRONG_PASSWORD' };
-                MOCK_CREDENTIALS[email] = nw;
+                const mockEmail = getMockUserId();
+                const mockPwd = getMockPassword();
+                if (!mockEmail || email !== mockEmail) return { success: false, error: 'USER_NOT_FOUND' };
+                if (mockPwd !== null && mockPwd !== cur) return { success: false, error: 'WRONG_PASSWORD' };
+                // Update password row in preferences
+                const pwdRow = MOCK_USER_PREFERENCES.find(r => Array.isArray(r) && String(r[0]).toLowerCase() === 'password');
+                if (pwdRow) pwdRow[1] = nw;
                 return { success: true };
             }
         };
@@ -2106,7 +2184,8 @@
             const email = (argOrPayload && (argOrPayload.userId || argOrPayload.userId === 0))
                 ? String(argOrPayload.userId).toLowerCase()
                 : (currentCredentials && currentCredentials.email ? String(currentCredentials.email).toLowerCase() : null);
-            const useMock = email && (typeof MOCK_CREDENTIALS === 'object') && Object.prototype.hasOwnProperty.call(MOCK_CREDENTIALS, email);
+            const mockEmail = getMockUserId();
+            const useMock = email && mockEmail && email === mockEmail;
             return useMock ? mockImpl : serverImpl;
         }
 
@@ -2406,7 +2485,9 @@
                 const canShow = (row) => {
                     if (!Array.isArray(row) || !row.length) return false;
                     const name = String(row[0] || '').trim();
-                    return name && name !== 'UserID';
+                    if (!name) return false;
+                    if (name === 'UserID' || name === 'Setting' || name === 'Password') return false; // hide header/user rows
+                    return true;
                 };
                 const autoNewCtx = { newCtrl: null, newRow: null, dueCtrl: null };
 
@@ -2640,6 +2721,11 @@
             if (!row || row[1] == null) {
                 // Fallback to credentials (persisted global settings) if present
                 try {
+                    const prefRow = (Array.isArray(userPreferences) ? userPreferences : []).find(r => Array.isArray(r) && String(r[0]) === String(name));
+                    if (prefRow && prefRow[1] != null) {
+                        const val = prefRow[1];
+                        return asNumber ? Number(val) : String(val).trim();
+                    }
                     if (currentCredentials && currentCredentials[name] !== undefined) {
                         const val = currentCredentials[name];
                         return asNumber ? Number(val) : String(val).trim();
@@ -3031,6 +3117,7 @@
             sess.availableSets.forEach(setName => {
                 const item = document.createElement('div');
                 item.className = 'submenu-item';
+                makeMenuItemFocusable(item);
                 if (setName === sess.activeSet) item.classList.add('active');
 
                 const label = document.createElement('span');
@@ -3122,13 +3209,19 @@
                 }
             }
 
-            ['testModeMenuItem', 'suspendMenuItem', 'settingsMenuItem'].forEach(id => {
+            ['testModeMenuItem', 'suspendMenuItem'].forEach(id => {
                 const el = $(id);
                 if (el) {
                     el.style.opacity = '0.5';
                     el.style.pointerEvents = 'none';
                 }
             });
+
+            const setSettingsEl = $('setSettingsOption');
+            if (setSettingsEl) {
+                setSettingsEl.style.opacity = '0.5';
+                setSettingsEl.style.pointerEvents = 'none';
+            }
         }
 
         function enableMenuItems(sess) {
@@ -3146,7 +3239,7 @@
                 }
             }
 
-            ['testModeMenuItem', 'suspendMenuItem', 'settingsMenuItem'].forEach(id => {
+            ['testModeMenuItem', 'suspendMenuItem'].forEach(id => {
                 const el = $(id);
                 if (el) {
                     if (hasActiveSet) {
@@ -3158,6 +3251,17 @@
                     }
                 }
             });
+
+            const setSettingsEl = $('setSettingsOption');
+            if (setSettingsEl) {
+                if (hasActiveSet) {
+                    setSettingsEl.style.opacity = '';
+                    setSettingsEl.style.pointerEvents = '';
+                } else {
+                    setSettingsEl.style.opacity = '0.5';
+                    setSettingsEl.style.pointerEvents = 'none';
+                }
+            }
         }
 
         function buildPayload(sess) {
@@ -3170,12 +3274,29 @@
             });
             log_('[buildPayload] Built ' + items.length + ' items');
 
+            const mergedUserPrefs = Array.isArray(sess.userPreferences)
+                ? sess.userPreferences
+                : (sess.userData
+                    ? [
+                        ['ThemeLight', (sess.userData.ThemeLight !== undefined ? sess.userData.ThemeLight : true)],
+                        ['AudioAutoPlay', (sess.userData.AudioAutoPlay !== undefined ? sess.userData.AudioAutoPlay : true)],
+                        ['PlaybackSpeed', (sess.userData.PlaybackSpeed !== undefined ? sess.userData.PlaybackSpeed : 1.5)]
+                    ]
+                    : []);
+
+            const combinedSettings = [
+                ...(Array.isArray(sess.userSettings) ? sess.userSettings : []),
+                ...mergedUserPrefs
+            ];
+
             // Determine mock-vs-server for this session using credentials or session hint
             const isMock = (typeof sess === 'object' && typeof sess._isMock === 'boolean')
                 ? sess._isMock
-                : (currentCredentials && currentCredentials.email
-                    ? Object.prototype.hasOwnProperty.call(MOCK_CREDENTIALS, String(currentCredentials.email).toLowerCase())
-                    : false);
+                : (function () {
+                    const mockEmail = getMockUserId();
+                    const credEmail = currentCredentials && currentCredentials.email ? String(currentCredentials.email).toLowerCase() : null;
+                    return mockEmail && credEmail && mockEmail === credEmail;
+                })();
 
             const schema = !isMock
                 ? (sess.studySetSchema && sess.userProgressSchema
@@ -3185,7 +3306,8 @@
 
             return {
                 items: items.map(r => Array.isArray(r) ? r.slice() : []),
-                settings: (sess.userSettings || []).map(r => Array.isArray(r) ? r.slice() : []),
+                settings: combinedSettings.map(r => Array.isArray(r) ? r.slice() : []),
+                userPreferences: mergedUserPrefs.map(r => Array.isArray(r) ? r.slice() : []),
                 setSettings: sess.setSettings || {},
                 activeSet: sess.activeSet || '',
                 availableSets: sess.availableSets || [],
@@ -3202,7 +3324,7 @@
                 userData: ensureGlobalDefaults(sess.userData || (function () {
                     const obj = { email: sess.userId };
                     try {
-                        for (const r of (sess.userSettings || [])) {
+                        for (const r of mergedUserPrefs) {
                             if (!Array.isArray(r) || !r.length) continue;
                             const k = String(r[0] || '').trim();
                             if (k === 'ThemeLight' || k === 'AudioAutoPlay' || k === 'PlaybackSpeed') obj[k] = r[1];
@@ -3231,7 +3353,8 @@
         //   cards: [[term, image, band, def, dist1, dist2, dist3], ...],
         //   userProgress: [[due, step, reps, lapses, suspended, tags], ...],
         //   setSettings: {AudioEnabled, AudioOnly, Ladder, Lang, ...},
-        //   userSettings: [['UserID', email], ['NewItemsPerDay', 4], ...]
+        //   userSettings: [['UserID', email], ['NewItemsPerDay', 4], ...],
+        //   userPreferences: [['ThemeLight', true], ['AudioAutoPlay', true], ['PlaybackSpeed', 1.5]]
         // }
         const DeckCache = {
             dbName: 'fsrs_decks',
@@ -3364,6 +3487,7 @@
                 // do not persist adminEmail in cached session; use server-provided value when available
                 cards: Array.isArray(deckData?.cards) ? deckData.cards : [],
                 userSettings: Array.isArray(deckData?.userSettings) ? stripGlobalSettingsFromArray(deckData.userSettings) : [],
+                userPreferences: Array.isArray(deckData?.userPreferences) ? deckData.userPreferences.map(r => Array.isArray(r) ? r.slice() : []) : [],
                 userData: (function () {
                     if (deckData && deckData.userData) return ensureGlobalDefaults(deckData.userData);
                     if (currentCredentials) return ensureGlobalDefaults({ email: currentCredentials.email, ThemeLight: currentCredentials.ThemeLight, AudioAutoPlay: currentCredentials.AudioAutoPlay, PlaybackSpeed: currentCredentials.PlaybackSpeed });
@@ -3456,6 +3580,7 @@
 
                     payload = buildPayload(cachedSess);
                     settings = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
+                    userPreferences = payload.userPreferences ? payload.userPreferences.map(r => Array.isArray(r) ? r.slice() : []) : [];
                     renderSettingsUI({ settings });
                     // Preview the theme using the draft (if available) rather than current stored value
                     try {
@@ -3507,10 +3632,10 @@
                 const deckDataForCache = {
                     cards: Array.isArray(sess.cards) ? sess.cards.map(r => Array.isArray(r) ? r.slice() : []) : [],
                     userSettings: Array.isArray(sess.userSettings) ? stripGlobalSettingsFromArray(sess.userSettings.map(r => Array.isArray(r) ? r.slice() : [])) : [],
+                    userPreferences: Array.isArray(sess.userPreferences) ? sess.userPreferences.map(r => Array.isArray(r) ? r.slice() : []) : [],
                     userProgress: Array.isArray(sess.userProgress) ? sess.userProgress.map(r => Array.isArray(r) ? r.slice() : []) : [],
                     setSettings: sess.setSettings || {},
                     // userData intentionally not persisted to IndexedDB (global user settings are volatile/local)
-
                 };
                 DeckCache.set(freshKey, deckDataForCache).catch(e => log_('[boot] Cache write failed:', e));
                 log_('[boot] Cache updated with fresh data');
@@ -3526,6 +3651,7 @@
                         // Rebuild payload with fresh data
                         payload = buildPayload(sess);
                         settings = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
+                        userPreferences = payload.userPreferences ? payload.userPreferences.map(r => Array.isArray(r) ? r.slice() : []) : [];
                         renderSettingsUI({ settings });
                         applyTheme();
                         autoAdjustNewItemsPerDay();
@@ -3562,6 +3688,7 @@
 
                 // Active settings (editable copy for this run)
                 settings = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
+                userPreferences = payload.userPreferences ? payload.userPreferences.map(r => Array.isArray(r) ? r.slice() : []) : [];
                 log_('[boot] Active settings copied, length=' + settings.length);
                 log_('[boot] Active settings:', JSON.stringify(settings));
                 renderSettingsUI({ settings });
@@ -3582,7 +3709,7 @@
                 log_('boot: error stack', err.stack);
                 // Decide mock fallback using credentials only (no global IS_MOCK)
                 const isMock = (currentCredentials && currentCredentials.email)
-                    ? Object.prototype.hasOwnProperty.call(MOCK_CREDENTIALS, String(currentCredentials.email).toLowerCase())
+                    ? (function () { const mockEmail = getMockUserId(); return mockEmail && String(currentCredentials.email).toLowerCase() === mockEmail; })()
                     : false;
                 if (!isMock) {
                     showError_('Failed to load session from server: ' + (err.message || String(err)));
@@ -3591,7 +3718,8 @@
                 // Mock fallback
                 payload = {
                     items: MOCK_ITEMS.map(r => r.slice()),
-                    settings: MOCK_USER_SETTINGS.map(r => Array.isArray(r) ? r.slice() : []),
+                    settings: [...MOCK_DECK_USER_SETTINGS, ...MOCK_USER_PREFERENCES].map(r => Array.isArray(r) ? r.slice() : []),
+                    userPreferences: MOCK_USER_PREFERENCES.map(r => Array.isArray(r) ? r.slice() : []),
                     setSettings: MOCK_SET_SETTINGS,
                     activeSet: 'TestSet',
                     schema: { lexiconCols: buildLexiconSchema(STUDY_SET_SCHEMA, USER_PROGRESS_SCHEMA) },
@@ -3606,6 +3734,7 @@
                     _isMock: true
                 };
                 settings = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
+                userPreferences = payload.userPreferences ? payload.userPreferences.map(r => Array.isArray(r) ? r.slice() : []) : [];
                 renderSettingsUI({ settings });
                 applyTheme();
                 $('quizArea').classList.remove('hidden');
@@ -3776,6 +3905,7 @@
             bands.forEach(band => {
                 const item = document.createElement('div');
                 item.className = 'submenu-item';
+                makeMenuItemFocusable(item);
                 const label = document.createElement('span');
                 label.textContent = `${band} (${bandCounts[band]})`;
                 item.appendChild(label);
@@ -3794,6 +3924,7 @@
             // Add "All Cards" option
             const allItem = document.createElement('div');
             allItem.className = 'submenu-item';
+            makeMenuItemFocusable(allItem);
             const allLabel = document.createElement('span');
             allLabel.textContent = `All Cards (${payload.items.length})`;
             allItem.appendChild(allLabel);
@@ -4304,10 +4435,19 @@
                     }
                     try { ensureGlobalDefaults(currentCredentials); localStorage.setItem('userData', JSON.stringify(currentCredentials)); } catch (e) { log_('Failed to persist credentials after settings save', e); }
 
-                    // Save to server as settings payload so server-side writes global settings to Users sheet
+                    // Update in-memory preferences so UI reflects latest values immediately
+                    userPreferences = draftCopy.map(r => Array.isArray(r) ? r.slice() : []);
+                    if (payload) {
+                        payload.userPreferences = userPreferences.map(r => Array.isArray(r) ? r.slice() : []);
+                        payload.settings = [...stripGlobalSettingsFromArray(payload.settings || []), ...userPreferences];
+                    }
+                    const deckOnly = stripGlobalSettingsFromArray(settings || []);
+                    settings = [...deckOnly, ...userPreferences.map(r => Array.isArray(r) ? r.slice() : [])];
+
+                    // Save to server as userPreferences payload so backend writes to Users sheet
                     SaveQueue.add('settings', {
                         saveType: 'settings',
-                        data: draftCopy
+                        userPreferences: draftCopy
                     });
                 } else {
                     // Deck-level settings
@@ -4328,7 +4468,7 @@
 
                     SaveQueue.add('settings', {
                         saveType: 'settings',
-                        data: settings
+                        deckSettings: settings
                     });
                 }
             } catch (e) { log_('Failed to process settings save', e); }
@@ -4409,6 +4549,9 @@
             const menuBtn = $('menuBtn');
             const menuDropdown = $('menuDropdown');
             log_('Menu elements found:', { menuBtn: !!menuBtn, menuDropdown: !!menuDropdown });
+
+            // Enable tab/Enter/Space navigation on menu and submenu items
+            document.querySelectorAll('.menu-item, .submenu-item').forEach(makeMenuItemFocusable);
 
             if (menuBtn && menuDropdown) {
                 let menuJustOpened = false;
@@ -4580,14 +4723,18 @@
             if (userPreferencesOption) {
                 userPreferencesOption.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    // show user preferences from localStorage.userData/currentCredentials
+                    // show user preferences from latest in-memory state or credentials
                     const creds = ensureGlobalDefaults(currentCredentials || {});
-                    const draft = [
-                        ['ThemeLight', creds.ThemeLight],
-                        ['AudioAutoPlay', creds.AudioAutoPlay],
-                        ['PlaybackSpeed', creds.PlaybackSpeed]
-                    ];
-                    settingsDraft = draft.map(r => Array.isArray(r) ? r.slice() : []);
+                    const prefs = (Array.isArray(userPreferences) && userPreferences.length)
+                        ? userPreferences.map(r => Array.isArray(r) ? r.slice() : [])
+                        : [
+                            ['Setting', 'Value'],
+                            ['UserID', creds.email || currentCredentials?.email || ''],
+                            ['ThemeLight', creds.ThemeLight],
+                            ['AudioAutoPlay', creds.AudioAutoPlay],
+                            ['PlaybackSpeed', creds.PlaybackSpeed]
+                        ];
+                    settingsDraft = prefs.map(r => Array.isArray(r) ? r.slice() : []);
                     settingsViewMode = 'user';
                     renderSettingsUI({ settings: settingsDraft });
                     try { document.querySelector('#settingsWrap h3').textContent = 'User Preferences'; } catch (e) { /* ignore */ }
