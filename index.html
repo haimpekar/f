@@ -2588,12 +2588,16 @@
                         valueEl.style.marginBottom = '6px';
                         valueEl.className = 'playback-value';
 
+                        const parsedVal = Number(value);
+                        const initialVal = Number.isFinite(parsedVal) ? parsedVal : 1.5;
+
                         ctrl = document.createElement('input');
                         ctrl.type = 'range';
                         ctrl.min = '0.25';
                         ctrl.max = '4';
                         ctrl.step = '0.25';
-                        ctrl.value = String(value ?? '1');
+                        ctrl.value = String(initialVal);
+                        r[1] = initialVal; // keep row normalized and in sync with the slider
                         // Do not force full-width here; let the existing
                         // `.settings-grid input` CSS rules control sizing so the
                         // slider matches other controls exactly.
@@ -3559,7 +3563,7 @@
             }
 
             try {
-                // If we have cached data, show it immediately
+                // If we have cached data, show it immediately (only when it has an active set)
                 if (cachedSess) {
                     if (currentCredentials && cachedSess.activeSet && currentCredentials.activeSet !== cachedSess.activeSet) {
                         saveCredentials(currentCredentials.email, currentCredentials.password, cachedSess.activeSet);
@@ -3569,37 +3573,37 @@
 
                     if (!cachedSess.activeSet) {
                         handleNoActiveSet(cachedSess);
-                        return;
+                        // still fetch fresh data below, but skip rendering settings/cards without an active set
+                    } else {
+                        enableMenuItems(cachedSess);
+
+                        if (!Array.isArray(cachedSess.cards) || !Array.isArray(cachedSess.userProgress)) {
+                            throw new Error('Cached session is invalid');
+                        }
+
+                        payload = buildPayload(cachedSess);
+                        settings = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
+                        userPreferences = payload.userPreferences ? payload.userPreferences.map(r => Array.isArray(r) ? r.slice() : []) : [];
+                        renderSettingsUI({ settings });
+                        // Preview the theme using the draft (if available) rather than current stored value
+                        try {
+                            // Save the current applied theme for potential revert
+                            _themePreviewOriginal = (function () {
+                                try { return getSetting(THEME_SETTING_NAME); } catch (e) { return currentCredentials?.ThemeLight; }
+                            })();
+                            const themeRow = (settingsDraft || []).find(r => Array.isArray(r) && String(r[0]) === 'ThemeLight');
+                            applyTheme(themeRow ? themeRow[1] : undefined);
+                        } catch (e) { _themePreviewOriginal = (document.body && document.body.dataset && document.body.dataset.theme === 'light'); applyTheme(); }
+                        autoAdjustNewItemsPerDay();
+
+                        $('quizArea').classList.remove('hidden');
+                        $('doneArea').classList.add('hidden');
+                        initAudioStateFromSettings();
+
+                        log_('[boot] Cached data displayed, fetching fresh in background');
+                        if (sb) sb.textContent = 'Syncing...';
+                        goNext();
                     }
-
-                    enableMenuItems(cachedSess);
-
-                    if (!Array.isArray(cachedSess.cards) || !Array.isArray(cachedSess.userProgress)) {
-                        throw new Error('Cached session is invalid');
-                    }
-
-                    payload = buildPayload(cachedSess);
-                    settings = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
-                    userPreferences = payload.userPreferences ? payload.userPreferences.map(r => Array.isArray(r) ? r.slice() : []) : [];
-                    renderSettingsUI({ settings });
-                    // Preview the theme using the draft (if available) rather than current stored value
-                    try {
-                        // Save the current applied theme for potential revert
-                        _themePreviewOriginal = (function () {
-                            try { return getSetting(THEME_SETTING_NAME); } catch (e) { return currentCredentials?.ThemeLight; }
-                        })();
-                        const themeRow = (settingsDraft || []).find(r => Array.isArray(r) && String(r[0]) === 'ThemeLight');
-                        applyTheme(themeRow ? themeRow[1] : undefined);
-                    } catch (e) { _themePreviewOriginal = (document.body && document.body.dataset && document.body.dataset.theme === 'light'); applyTheme(); }
-                    autoAdjustNewItemsPerDay();
-
-                    $('quizArea').classList.remove('hidden');
-                    $('doneArea').classList.add('hidden');
-                    initAudioStateFromSettings();
-
-                    log_('[boot] Cached data displayed, fetching fresh in background');
-                    if (sb) sb.textContent = 'Syncing...';
-                    goNext();
                 }
 
                 // Always fetch fresh data in background
