@@ -1532,6 +1532,9 @@
         // Set this in code (no persistence)
         let DEBUG_MODE = 'Fireglass';
 
+        // Extra noisy, component-specific debug (keep OFF by default)
+        const DEBUG_PLAYBACK_SPEED_LOGS = false;
+
         function setDebugMode(mode) {
             const m = String(mode || '').trim();
             DEBUG_MODE = (m === 'No' || m === 'Regular' || m === 'Fireglass') ? m : 'Regular';
@@ -1544,7 +1547,9 @@
                 if (!_debugPane) {
                     const pane = document.createElement('div');
                     pane.id = 'debugPane';
-                    pane.style.cssText = 'position:fixed;left:0;right:0;bottom:0;max-height:35vh;overflow:auto;background:rgba(255,255,255,0.92);border-top:1px solid #ddd;padding:6px 8px;z-index:99999;font-size:12px;color:#555;';
+                    // Keep visible but NEVER block clicks/taps on the app.
+                    // Also keep it behind modals (modals use z-index: 50).
+                    pane.style.cssText = 'position:fixed;left:0;right:0;bottom:0;max-height:30vh;overflow:auto;background:rgba(255,255,255,0.92);border-top:1px solid #ddd;padding:6px 8px;z-index:40;font-size:12px;color:#555;pointer-events:none;';
                     // In dark theme, keep pane readable
                     try {
                         if (document.body && document.body.dataset && document.body.dataset.theme === 'dark') {
@@ -1581,7 +1586,6 @@
             const line = parts.join(' ');
             if (DEBUG_MODE === 'Fireglass') {
                 debug('[DEBUG] ' + line);
-                try { console.log('[DEBUG]', ...args); } catch (e) { /* ignore */ }
                 return;
             }
             try { console.log('[DEBUG]', ...args); } catch (e) { /* ignore */ }
@@ -2649,7 +2653,9 @@
 
                         const parsedVal = Number(value);
                         const initialVal = Number.isFinite(parsedVal) ? parsedVal : 1.5;
-                        if (DEBUG_MODE === 'Fireglass') log_('[PlaybackSpeed] row value=', value, 'parsedVal=', parsedVal, 'initialVal=', initialVal);
+                        if (DEBUG_MODE === 'Fireglass' && DEBUG_PLAYBACK_SPEED_LOGS) {
+                            log_('[PlaybackSpeed] row value=', value, 'parsedVal=', parsedVal, 'initialVal=', initialVal);
+                        }
 
                         ctrl = document.createElement('input');
                         ctrl.type = 'range';
@@ -2657,7 +2663,9 @@
                         ctrl.max = '4';
                         ctrl.step = '0.25';
                         ctrl.value = String(initialVal);
-                        if (DEBUG_MODE === 'Fireglass') log_('[PlaybackSpeed] ctrl.value after set=', ctrl.value);
+                        if (DEBUG_MODE === 'Fireglass' && DEBUG_PLAYBACK_SPEED_LOGS) {
+                            log_('[PlaybackSpeed] ctrl.value after set=', ctrl.value);
+                        }
                         r[1] = initialVal; // keep row normalized and in sync with the slider
                         // Force LTR on the slider to prevent RTL reversal (thumb position must match value)
                         ctrl.style.direction = 'ltr';
