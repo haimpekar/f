@@ -2586,15 +2586,23 @@
                         ctrl.type = 'number';
                         ctrl.value = String(value ?? '');
                     } else if (name === 'PlaybackSpeed') {
-                        // Render playback speed with centered numeric value ABOVE the slider
+                        // Render playback speed with numeric value ABOVE THE THUMB (not centered)
                         const wrapper = document.createElement('div');
                         wrapper.style.display = 'flex';
                         wrapper.style.flexDirection = 'column';
-                        wrapper.style.alignItems = 'center';
+                        wrapper.style.alignItems = 'stretch';
+                        wrapper.style.position = 'relative';
+                        wrapper.style.width = '100%';
+                        // Reserve vertical space for the floating label
+                        wrapper.style.paddingTop = '18px';
 
                         const valueEl = document.createElement('div');
+                        valueEl.style.position = 'absolute';
+                        valueEl.style.top = '0';
+                        valueEl.style.left = '0';
+                        valueEl.style.transform = 'translateX(-50%)';
+                        valueEl.style.whiteSpace = 'nowrap';
                         valueEl.style.textAlign = 'center';
-                        valueEl.style.marginBottom = '6px';
                         valueEl.className = 'playback-value';
 
                         const parsedVal = Number(value);
@@ -2607,13 +2615,15 @@
                         ctrl.step = '0.25';
                         ctrl.value = String(initialVal);
                         r[1] = initialVal; // keep row normalized and in sync with the slider
+                        // Force LTR so thumb position matches value even on RTL pages
+                        ctrl.style.direction = 'ltr';
                         // Do not force full-width here; let the existing
                         // `.settings-grid input` CSS rules control sizing so the
                         // slider matches other controls exactly.
                         ctrl.style.margin = '0';
                         ctrl.style.padding = '0';
 
-                        // Put the numeric value above the slider in the center
+                        // Put the numeric value above the slider (positioned over the thumb)
                         wrapper.appendChild(valueEl);
                         wrapper.appendChild(ctrl);
                         // Place wrapper into ctrlWrap instead of raw ctrl element
@@ -2674,13 +2684,28 @@
                                 return n.toFixed(2).replace(/\.?(0+)$/, '').replace(/\.$/, '');
                             };
 
+                            const updatePlaybackLabel = () => {
+                                const pv = ctrlWrap.querySelector('.playback-value');
+                                if (!pv) return;
+                                pv.textContent = `×${fmt(ctrl.value)}`;
+
+                                const min = Number(ctrl.min);
+                                const max = Number(ctrl.max);
+                                const v = Number(ctrl.value);
+                                if (!Number.isFinite(min) || !Number.isFinite(max) || !Number.isFinite(v) || max === min) {
+                                    pv.style.left = '50%';
+                                    return;
+                                }
+                                const pct = Math.min(1, Math.max(0, (v - min) / (max - min)));
+                                pv.style.left = `${pct * 100}%`;
+                            };
+
                             // Find the playback value element we created earlier (if any)
                             const pv = ctrlWrap.querySelector('.playback-value');
                             if (pv) {
-                                pv.textContent = `×${fmt(ctrl.value)}`;
-                                ctrl.addEventListener('input', () => {
-                                    pv.textContent = `×${fmt(ctrl.value)}`;
-                                });
+                                updatePlaybackLabel();
+                                ctrl.addEventListener('input', updatePlaybackLabel);
+                                window.addEventListener('resize', updatePlaybackLabel);
                             }
                         } catch (e) {
                             log_('Failed to attach PlaybackSpeed display', e);
