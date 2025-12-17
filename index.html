@@ -2479,6 +2479,15 @@
                         ? bundle.settings.map(r => Array.isArray(r) ? r.slice() : [])
                         : []);
 
+                // Normalize playback speed rows so slider and numeric label stay in sync
+                rows.forEach(r => {
+                    if (!Array.isArray(r) || r.length < 2) return;
+                    if (String(r[0]) !== 'PlaybackSpeed') return;
+                    const n = Number(r[1]);
+                    const clamped = Number.isFinite(n) ? Math.min(4, Math.max(0.25, n)) : 1.5;
+                    r[1] = clamped;
+                });
+
                 settingsDraft = rows;
                 grid.innerHTML = '';
 
@@ -2589,7 +2598,7 @@
                         valueEl.className = 'playback-value';
 
                         const parsedVal = Number(value);
-                        const initialVal = Number.isFinite(parsedVal) ? parsedVal : 1.5;
+                        const initialVal = Number.isFinite(parsedVal) ? Math.min(4, Math.max(0.25, parsedVal)) : 1.5;
 
                         ctrl = document.createElement('input');
                         ctrl.type = 'range';
