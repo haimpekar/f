@@ -1525,8 +1525,67 @@
         let userPreferences = []; // global user preferences (separate from deck settings)
         let settingsViewMode = 'set'; // 'set' or 'user' - controls which settings panel is being edited
         let testState = null; // { activeSet, shuffledIndices, currentIndex, score, startTime, totalQuestions }
-        const DEBUG_MODE = true; // Set to true to enable debug logging
-        function log_(...args) { if (DEBUG_MODE) console.log('[DEBUG]', ...args); }
+        // Debug modes:
+        // - 'No'        : no debug output
+        // - 'Regular'   : console logging
+        // - 'Fireglass' : render logs into the DOM (and also try console)
+        // Set this in code (no persistence)
+        let DEBUG_MODE = 'Regular';
+
+        function setDebugMode(mode) {
+            const m = String(mode || '').trim();
+            DEBUG_MODE = (m === 'No' || m === 'Regular' || m === 'Fireglass') ? m : 'Regular';
+        }
+
+        let _debugPane = null;
+        function debug(msg) {
+            // Fireglass-safe: writes to DOM so you can inspect without DevTools.
+            try {
+                if (!_debugPane) {
+                    const pane = document.createElement('div');
+                    pane.id = 'debugPane';
+                    pane.style.cssText = 'position:fixed;left:0;right:0;bottom:0;max-height:35vh;overflow:auto;background:rgba(255,255,255,0.92);border-top:1px solid #ddd;padding:6px 8px;z-index:99999;font-size:12px;color:#555;';
+                    // In dark theme, keep pane readable
+                    try {
+                        if (document.body && document.body.dataset && document.body.dataset.theme === 'dark') {
+                            pane.style.background = 'rgba(20,20,22,0.92)';
+                            pane.style.borderTop = '1px solid #333';
+                            pane.style.color = '#bbb';
+                        }
+                    } catch (e) { /* ignore */ }
+                    _debugPane = pane;
+                    const attach = () => {
+                        if (!_debugPane || !_debugPane.parentNode) document.body.appendChild(_debugPane);
+                    };
+                    if (document.body) attach();
+                    else window.addEventListener('DOMContentLoaded', attach, { once: true });
+                }
+                const el = document.createElement('div');
+                el.textContent = String(msg);
+                el.style.cssText = 'font-size:12px;color:inherit;opacity:0.95;white-space:pre-wrap;word-break:break-word;';
+                _debugPane.appendChild(el);
+                // Keep latest visible
+                _debugPane.scrollTop = _debugPane.scrollHeight;
+            } catch (e) {
+                // last resort: do nothing
+            }
+        }
+
+        function log_(...args) {
+            if (DEBUG_MODE === 'No') return;
+            const parts = args.map(a => {
+                if (a instanceof Error) return `${a.message}\n${a.stack || ''}`.trim();
+                if (typeof a === 'string') return a;
+                try { return JSON.stringify(a); } catch (e) { return String(a); }
+            });
+            const line = parts.join(' ');
+            if (DEBUG_MODE === 'Fireglass') {
+                debug('[DEBUG] ' + line);
+                try { console.log('[DEBUG]', ...args); } catch (e) { /* ignore */ }
+                return;
+            }
+            try { console.log('[DEBUG]', ...args); } catch (e) { /* ignore */ }
+        }
         function logBackendDebug(entries, label) {
             if (!Array.isArray(entries) || entries.length === 0) return;
             const title = label ? `[BACKEND DEBUG ${label}]` : '[BACKEND DEBUG]';
@@ -2590,7 +2649,7 @@
 
                         const parsedVal = Number(value);
                         const initialVal = Number.isFinite(parsedVal) ? parsedVal : 1.5;
-                        log_('[PlaybackSpeed] row value=', value, 'parsedVal=', parsedVal, 'initialVal=', initialVal);
+                        if (DEBUG_MODE === 'Fireglass') log_('[PlaybackSpeed] row value=', value, 'parsedVal=', parsedVal, 'initialVal=', initialVal);
 
                         ctrl = document.createElement('input');
                         ctrl.type = 'range';
@@ -2598,7 +2657,7 @@
                         ctrl.max = '4';
                         ctrl.step = '0.25';
                         ctrl.value = String(initialVal);
-                        log_('[PlaybackSpeed] ctrl.value after set=', ctrl.value);
+                        if (DEBUG_MODE === 'Fireglass') log_('[PlaybackSpeed] ctrl.value after set=', ctrl.value);
                         r[1] = initialVal; // keep row normalized and in sync with the slider
                         // Force LTR on the slider to prevent RTL reversal (thumb position must match value)
                         ctrl.style.direction = 'ltr';
