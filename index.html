@@ -2479,15 +2479,6 @@
                         ? bundle.settings.map(r => Array.isArray(r) ? r.slice() : [])
                         : []);
 
-                // Normalize playback speed rows so slider and numeric label stay in sync
-                rows.forEach(r => {
-                    if (!Array.isArray(r) || r.length < 2) return;
-                    if (String(r[0]) !== 'PlaybackSpeed') return;
-                    const n = Number(r[1]);
-                    const clamped = Number.isFinite(n) ? Math.min(4, Math.max(0.25, n)) : 1.5;
-                    r[1] = clamped;
-                });
-
                 settingsDraft = rows;
                 grid.innerHTML = '';
 
@@ -2553,15 +2544,8 @@
                         if (!ctrl) return;
                         if (name === 'QuizMode' || name === 'ThemeLight' || name === 'AudioAutoPlay') {
                             r[1] = ctrl.value === 'true';
-                        } else if (name === 'NewItemsPerDay') {
+                        } else if (name === 'NewItemsPerDay' || name === 'PlaybackSpeed') {
                             r[1] = Number(ctrl.value);
-                        } else if (name === 'PlaybackSpeed') {
-                            const raw = Number(ctrl.value);
-                            if (ctrl._rtlFlip && typeof ctrl._fromRaw === 'function') {
-                                r[1] = ctrl._fromRaw(raw);
-                            } else {
-                                r[1] = raw;
-                            }
                         } else {
                             r[1] = ctrl.value;
                         }
@@ -2593,16 +2577,11 @@
                         ctrl.type = 'number';
                         ctrl.value = String(value ?? '');
                     } else if (name === 'PlaybackSpeed') {
-                        // Render playback speed with centered numeric value ABOVE the slider.
-                        // In RTL contexts some browsers visually reverse <input type="range">,
-                        // which can make a value like 1.5 appear at the position for ~3.
-                        // To keep the thumb position consistent with the displayed value,
-                        // we mirror the underlying slider value in RTL.
+                        // Render playback speed with centered numeric value ABOVE the slider
                         const wrapper = document.createElement('div');
                         wrapper.style.display = 'flex';
                         wrapper.style.flexDirection = 'column';
                         wrapper.style.alignItems = 'center';
-                        wrapper.style.width = '100%';
 
                         const valueEl = document.createElement('div');
                         valueEl.style.textAlign = 'center';
@@ -2610,64 +2589,27 @@
                         valueEl.className = 'playback-value';
 
                         const parsedVal = Number(value);
-                        const initialVal = Number.isFinite(parsedVal) ? Math.min(4, Math.max(0.25, parsedVal)) : 1.5;
+                        const initialVal = Number.isFinite(parsedVal) ? parsedVal : 1.5;
+                        log_('[PlaybackSpeed] row value=', value, 'parsedVal=', parsedVal, 'initialVal=', initialVal);
 
                         ctrl = document.createElement('input');
                         ctrl.type = 'range';
                         ctrl.min = '0.25';
                         ctrl.max = '4';
                         ctrl.step = '0.25';
-                        r[1] = initialVal; // keep row normalized and in sync with the displayed value
-
-                        // Detect RTL context (dir attribute or computed direction)
-                        let isRtl = false;
-                        try {
-                            const nearestDir = ctrlWrap.closest('[dir]');
-                            const dirAttr = nearestDir ? String(nearestDir.getAttribute('dir') || '').toLowerCase() : '';
-                            if (dirAttr === 'rtl') {
-                                isRtl = true;
-                            } else {
-                                const csWrap = window.getComputedStyle(ctrlWrap);
-                                const csBody = window.getComputedStyle(document.body);
-                                isRtl = (csWrap && csWrap.direction === 'rtl') || (csBody && csBody.direction === 'rtl');
-                            }
-                        } catch (e) {
-                            isRtl = false;
-                        }
-
-                        const minN = Number(ctrl.min);
-                        const maxN = Number(ctrl.max);
-                        const toRaw = (displayVal) => {
-                            const v = Number(displayVal);
-                            if (!Number.isFinite(minN) || !Number.isFinite(maxN) || !Number.isFinite(v)) return v;
-                            return (minN + maxN) - v;
-                        };
-                        const fromRaw = (rawVal) => {
-                            const v = Number(rawVal);
-                            if (!Number.isFinite(minN) || !Number.isFinite(maxN) || !Number.isFinite(v)) return v;
-                            return (minN + maxN) - v;
-                        };
-
-                        // Store mapping info on the control so updateSettingValue can stay correct
-                        ctrl._rtlFlip = !!isRtl;
-                        ctrl._fromRaw = fromRaw;
-
-                        if (ctrl._rtlFlip) {
-                            // Keep RTL so the browser's native RTL behavior stays consistent,
-                            // but mirror the raw value so the thumb matches the displayed value.
-                            ctrl.style.direction = 'rtl';
-                            ctrl.value = String(toRaw(initialVal));
-                        } else {
-                            ctrl.style.direction = 'ltr';
-                            ctrl.value = String(initialVal);
-                        }
+                        ctrl.value = String(initialVal);
+                        log_('[PlaybackSpeed] ctrl.value after set=', ctrl.value);
+                        r[1] = initialVal; // keep row normalized and in sync with the slider
+                        // Force LTR on the slider to prevent RTL reversal (thumb position must match value)
+                        ctrl.style.direction = 'ltr';
+                        ctrl.setAttribute('dir', 'ltr');
                         // Do not force full-width here; let the existing
                         // `.settings-grid input` CSS rules control sizing so the
                         // slider matches other controls exactly.
                         ctrl.style.margin = '0';
                         ctrl.style.padding = '0';
 
-                        // Put the numeric value above the slider (positioned over the thumb)
+                        // Put the numeric value above the slider in the center
                         wrapper.appendChild(valueEl);
                         wrapper.appendChild(ctrl);
                         // Place wrapper into ctrlWrap instead of raw ctrl element
@@ -2731,16 +2673,9 @@
                             // Find the playback value element we created earlier (if any)
                             const pv = ctrlWrap.querySelector('.playback-value');
                             if (pv) {
-                                // Display the *user-facing* value (mirrored in RTL)
-                                const getDisplayVal = () => {
-                                    const raw = Number(ctrl.value);
-                                    if (ctrl._rtlFlip && typeof ctrl._fromRaw === 'function') return ctrl._fromRaw(raw);
-                                    return raw;
-                                };
-
-                                pv.textContent = `×${fmt(getDisplayVal())}`;
+                                pv.textContent = `×${fmt(ctrl.value)}`;
                                 ctrl.addEventListener('input', () => {
-                                    pv.textContent = `×${fmt(getDisplayVal())}`;
+                                    pv.textContent = `×${fmt(ctrl.value)}`;
                                 });
                             }
                         } catch (e) {
