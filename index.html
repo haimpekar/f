@@ -2427,7 +2427,40 @@
 
         function parseDue_(v) {
             if (!v) return 0;
-            const d = new Date(v);
+            if (v instanceof Date) return isNaN(v.getTime()) ? 0 : v;
+            if (typeof v === 'number') {
+                const dn = new Date(v);
+                return isNaN(dn.getTime()) ? 0 : dn;
+            }
+            const s = String(v).trim();
+            if (!s) return 0;
+
+            // Preferred format across frontend + backend: "YYYY-MM-DD HH:MM:SS" (local time, no timezone).
+            // Do NOT rely on Date.parse for this format; explicitly parse for consistency.
+            const mDateTime = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/);
+            if (mDateTime) {
+                const y = Number(mDateTime[1]);
+                const mo = Number(mDateTime[2]);
+                const d0 = Number(mDateTime[3]);
+                const hh = Number(mDateTime[4]);
+                const mi = Number(mDateTime[5]);
+                const ss = Number(mDateTime[6]);
+                const dt = new Date(y, mo - 1, d0, hh, mi, ss, 0);
+                return isNaN(dt.getTime()) ? 0 : dt;
+            }
+
+            // Date-only format: "YYYY-MM-DD" -> local midnight
+            const mDateOnly = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (mDateOnly) {
+                const y = Number(mDateOnly[1]);
+                const mo = Number(mDateOnly[2]);
+                const d0 = Number(mDateOnly[3]);
+                const dt = new Date(y, mo - 1, d0, 0, 0, 0, 0);
+                return isNaN(dt.getTime()) ? 0 : dt;
+            }
+
+            // Back-compat: accept ISO strings (e.g. previous "YYYY-MM-DDTHH:mm:ssZ").
+            const d = new Date(s);
             return isNaN(d.getTime()) ? 0 : d;
         }
 
@@ -4610,21 +4643,16 @@
             const scale = Math.min(2, Math.max(0.5, 1 + 0.3 * (delay / denom)));
             const nextDue = new Date(now + Inext * scale * 86400000);
 
-            // Preserve time-of-day for sub-day intervals (e.g. 1/1440 = 1 minute).
-            // Without this, all intra-day schedules collapse to the same YYYY-MM-DD,
-            // causing repeated reviews of the same earliest-index card.
+            // Store due consistently as "YYYY-MM-DD HH:MM:SS" (local time).
+            // This matches Apps Script's sanitize2DArray_ format for Date cells.
             const pad2 = (n) => String(n).padStart(2, '0');
-            const yyyy = nextDue.getUTCFullYear();
-            const mm = pad2(nextDue.getUTCMonth() + 1);
-            const dd = pad2(nextDue.getUTCDate());
-            if (Number(Inext) > 0 && Number(Inext) < 1) {
-                const hh = pad2(nextDue.getUTCHours());
-                const mi = pad2(nextDue.getUTCMinutes());
-                const ss = pad2(nextDue.getUTCSeconds());
-                row[C.due] = `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}Z`;
-            } else {
-                row[C.due] = `${yyyy}-${mm}-${dd}`;
-            }
+            const yyyy = nextDue.getFullYear();
+            const mm = pad2(nextDue.getMonth() + 1);
+            const dd = pad2(nextDue.getDate());
+            const hh = pad2(nextDue.getHours());
+            const mi = pad2(nextDue.getMinutes());
+            const ss = pad2(nextDue.getSeconds());
+            row[C.due] = `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
         }
 
         function onAnswer(chosenIndex, correctIndex) {
