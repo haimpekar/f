@@ -1909,13 +1909,9 @@
                     return;
                 }
 
-                // Deduplicate: remove older saves of same type (distinguish deck vs user preferences)
-                const isPrefsSave = saveType === 'settings' && data && Array.isArray(data.userPreferences);
-                const isDeckSave = saveType === 'settings' && data && Array.isArray(data.deckSettings);
-                const typeKey = (saveType === 'settings')
-                    ? (isPrefsSave ? 'settings:userPreferences' : 'settings:deck')
-                    : saveType;
-                if (saveType === 'progress' || saveType === 'settings') {
+                // Deduplicate: remove older saves of same type
+                const typeKey = saveType;
+                if (saveType === 'progress' || saveType === 'deckSettings' || saveType === 'userPreferences') {
                     this.queue = this.queue.filter(item => item.typeKey !== typeKey);
                 }
 
@@ -2186,10 +2182,19 @@
             },
             async saveSession(payload) {
                 this._lastSaved = payload;
-                if (payload?.saveType === 'settings') {
+                if (payload?.saveType === 'deckSettings' || payload?.saveType === 'userPreferences' || payload?.saveType === 'settings') {
                     // Prefer new separated fields; fall back to legacy data array
-                    let deckSettings = Array.isArray(payload.deckSettings) ? payload.deckSettings : [];
-                    let globalSettings = Array.isArray(payload.userPreferences) ? payload.userPreferences : [];
+                    let deckSettings = [];
+                    let globalSettings = [];
+
+                    if (payload?.saveType === 'deckSettings') {
+                        deckSettings = Array.isArray(payload.data) ? payload.data : (Array.isArray(payload.deckSettings) ? payload.deckSettings : []);
+                    } else if (payload?.saveType === 'userPreferences') {
+                        globalSettings = Array.isArray(payload.data) ? payload.data : (Array.isArray(payload.userPreferences) ? payload.userPreferences : []);
+                    } else {
+                        deckSettings = Array.isArray(payload.deckSettings) ? payload.deckSettings : [];
+                        globalSettings = Array.isArray(payload.userPreferences) ? payload.userPreferences : [];
+                    }
 
                     if ((!deckSettings.length && !globalSettings.length) && Array.isArray(payload.data)) {
                         payload.data.forEach(row => {
@@ -4521,9 +4526,9 @@
                     settings = [...deckOnly, ...userPreferences.map(r => Array.isArray(r) ? r.slice() : [])];
 
                     // Save to server as userPreferences payload so backend writes to Users sheet
-                    SaveQueue.add('settings', {
-                        saveType: 'settings',
-                        userPreferences: draftCopy
+                    SaveQueue.add('userPreferences', {
+                        saveType: 'userPreferences',
+                        data: draftCopy
                     });
                 } else {
                     // Deck-level settings
@@ -4542,9 +4547,9 @@
                         try { ensureGlobalDefaults(currentCredentials); localStorage.setItem('userData', JSON.stringify(currentCredentials)); } catch (e) { log_('Failed to persist credentials after settings save', e); }
                     } catch (e) { /* ignore */ }
 
-                    SaveQueue.add('settings', {
-                        saveType: 'settings',
-                        deckSettings: settings
+                    SaveQueue.add('deckSettings', {
+                        saveType: 'deckSettings',
+                        data: settings
                     });
                 }
             } catch (e) { log_('Failed to process settings save', e); }
