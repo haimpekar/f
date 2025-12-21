@@ -1551,6 +1551,38 @@
             }
         }
 
+        let _consoleTsInstalled = false;
+        function installConsoleTimestamps_() {
+            try {
+                if (_consoleTsInstalled) return;
+                if (typeof console !== 'object' || !console) return;
+                if (console.__tsWrapped) { _consoleTsInstalled = true; return; }
+
+                const wrap = (methodName) => {
+                    const orig = console[methodName];
+                    if (typeof orig !== 'function') return;
+                    console[methodName] = (...args) => {
+                        try {
+                            const ts = formatTs_();
+                            // Keep it simple: always put timestamp as first arg
+                            return orig.call(console, ts, ...args);
+                        } catch {
+                            try { return orig.call(console, ...args); } catch { /* ignore */ }
+                        }
+                    };
+                };
+
+                ['log', 'info', 'warn', 'error', 'debug'].forEach(wrap);
+                console.__tsWrapped = true;
+                _consoleTsInstalled = true;
+            } catch {
+                // ignore
+            }
+        }
+
+        // Ensure console.* messages also include timestamps
+        installConsoleTimestamps_();
+
         let _debugPane = null;
         let _debugScrollHandlersInstalled = false;
         function debug(msg) {
@@ -1684,7 +1716,7 @@
                 debug(`[DEBUG] ${line}`);
                 return;
             }
-            try { console.log(ts, '[DEBUG]', ...args); } catch (e) { /* ignore */ }
+            try { console.log('[DEBUG]', ...args); } catch (e) { /* ignore */ }
         }
         function logBackendDebug(entries, label) {
             if (!Array.isArray(entries) || entries.length === 0) return;
