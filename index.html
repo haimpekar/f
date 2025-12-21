@@ -2655,8 +2655,68 @@
         let settingsDraft = null;
         // Store original theme when opening settings so that Cancel can revert preview
         let _themePreviewOriginal = null;
+        // Store original in-memory settings so Cancel can revert previewed changes
+        let _settingsPreviewOriginal = null;
+        let _userPreferencesPreviewOriginal = null;
+        let _payloadSettingsPreviewOriginal = null;
+        let _payloadUserPreferencesPreviewOriginal = null;
         // 2025-11-07 13:40 IDT — Settings as matrix: render using schema indices
         const THEME_SETTING_NAME = 'ThemeLight';
+
+        function cloneSettingsMatrix_(rows) {
+            if (!Array.isArray(rows)) return [];
+            return rows.map(r => Array.isArray(r) ? r.slice() : []);
+        }
+
+        function setMatrixValue_(rows, name, value) {
+            if (!Array.isArray(rows) || !name) return rows;
+            const key = String(name);
+            const idx = rows.findIndex(r => Array.isArray(r) && String(r[0]) === key);
+            if (idx >= 0) {
+                rows[idx][1] = value;
+            } else {
+                rows.push([key, value]);
+            }
+            return rows;
+        }
+
+        function applyLiveSettingPreview_(name, value) {
+            try {
+                // Always mirror into the live combined settings matrix used by getSetting()
+                if (Array.isArray(settings)) {
+                    setMatrixValue_(settings, name, value);
+                }
+                if (payload && Array.isArray(payload.settings)) {
+                    setMatrixValue_(payload.settings, name, value);
+                }
+
+                // If editing user preferences, also mirror into userPreferences (and payload.userPreferences)
+                if (settingsViewMode === 'user') {
+                    if (!Array.isArray(userPreferences)) userPreferences = [];
+                    setMatrixValue_(userPreferences, name, value);
+                    if (payload) {
+                        if (!Array.isArray(payload.userPreferences)) payload.userPreferences = [];
+                        setMatrixValue_(payload.userPreferences, name, value);
+                    }
+                }
+
+                // Immediate UI/behavior updates
+                if (name === 'NewItemsPerDay' || name === 'TestDueDate') {
+                    // Avoid clobbering the Test Mode status bar
+                    if (!testState) updateSessionStats();
+                }
+                if (name === 'QuizMode') {
+                    // Apply new mode immediately to the next render
+                    if (testState) {
+                        renderTestQuestion();
+                    } else if (payload && payload.state && payload.state.currentIndex >= 0) {
+                        renderTerm();
+                    }
+                }
+            } catch (e) {
+                log_('applyLiveSettingPreview_ failed', e);
+            }
+        }
 
         function applyTheme(val) {
             // Accept an explicit value to preview a change while editing settings
@@ -2720,6 +2780,7 @@
                     const perDay = Math.max(5, Math.ceil(totalNew / days));
                     ctrl.value = perDay;
                     autoNewCtx.newRow[1] = perDay;
+                    applyLiveSettingPreview_('NewItemsPerDay', perDay);
                     ctrl.disabled = true;
                     ctrl.title = 'Auto-calculated from TestDueDate';
                 };
@@ -2760,9 +2821,7 @@
                             // Pass explicit value so the preview updates immediately while editing
                             applyTheme(r[1]);
                         }
-                        if (name === 'TestDueDate') {
-                            syncAutoNewRate();
-                        }
+                        applyLiveSettingPreview_(name, r[1]);
                     };
                     if (name === 'TestDueDate') {
                         ctrl = document.createElement('input');
@@ -4635,6 +4694,14 @@
             if (modalEl) modalEl.hidden = true;
             setProgress();
 
+            // Preview snapshots no longer needed after Save
+            try {
+                _settingsPreviewOriginal = null;
+                _userPreferencesPreviewOriginal = null;
+                _payloadSettingsPreviewOriginal = null;
+                _payloadUserPreferencesPreviewOriginal = null;
+            } catch (e) { /* ignore */ }
+
             // Re-render current card if one is showing
             if (payload && payload.state && payload.state.currentIndex >= 0) {
                 renderTerm();
@@ -4920,6 +4987,11 @@
                     draft = stripGlobalSettingsFromArray(draft);
                     settingsDraft = draft;
                     settingsViewMode = 'set';
+                    // Snapshot current in-memory state so Cancel can revert
+                    _settingsPreviewOriginal = cloneSettingsMatrix_(settings);
+                    _userPreferencesPreviewOriginal = cloneSettingsMatrix_(userPreferences);
+                    _payloadSettingsPreviewOriginal = cloneSettingsMatrix_(payload?.settings);
+                    _payloadUserPreferencesPreviewOriginal = cloneSettingsMatrix_(payload?.userPreferences);
                     // Capture original theme for revert on cancel
                     try {
                         _themePreviewOriginal = (function () {
@@ -4956,6 +5028,11 @@
                         ];
                     settingsDraft = prefs.map(r => Array.isArray(r) ? r.slice() : []);
                     settingsViewMode = 'user';
+                    // Snapshot current in-memory state so Cancel can revert
+                    _settingsPreviewOriginal = cloneSettingsMatrix_(settings);
+                    _userPreferencesPreviewOriginal = cloneSettingsMatrix_(userPreferences);
+                    _payloadSettingsPreviewOriginal = cloneSettingsMatrix_(payload?.settings);
+                    _payloadUserPreferencesPreviewOriginal = cloneSettingsMatrix_(payload?.userPreferences);
                     renderSettingsUI({ settings: settingsDraft });
                     try { document.querySelector('#settingsWrap h3').textContent = 'User Preferences'; } catch (e) { /* ignore */ }
                     try { $('settingsHint').textContent = 'Preferences saved to your account'; } catch (e) { /* ignore */ }
@@ -5180,7 +5257,30 @@
                 settingsDraft = null;
                 modal.hidden = true;
                 try { applyTheme(_themePreviewOriginal); } catch (e) { log_('Failed to revert theme on cancel', e); }
+                // Revert any previewed setting changes
+                try {
+                    if (_settingsPreviewOriginal) settings = cloneSettingsMatrix_(_settingsPreviewOriginal);
+                    if (_userPreferencesPreviewOriginal) userPreferences = cloneSettingsMatrix_(_userPreferencesPreviewOriginal);
+                    if (payload) {
+                        if (_payloadSettingsPreviewOriginal) payload.settings = cloneSettingsMatrix_(_payloadSettingsPreviewOriginal);
+                        if (_payloadUserPreferencesPreviewOriginal) payload.userPreferences = cloneSettingsMatrix_(_payloadUserPreferencesPreviewOriginal);
+                    }
+                    if (testState) {
+                        renderTestQuestion();
+                    } else {
+                        updateSessionStats();
+                        if (payload && payload.state && payload.state.currentIndex >= 0) renderTerm();
+                    }
+                } catch (e) {
+                    log_('Failed to revert settings preview on cancel', e);
+                }
                 try { _themePreviewOriginal = null; } catch (e) { /* ignore */ }
+                try {
+                    _settingsPreviewOriginal = null;
+                    _userPreferencesPreviewOriginal = null;
+                    _payloadSettingsPreviewOriginal = null;
+                    _payloadUserPreferencesPreviewOriginal = null;
+                } catch (e) { /* ignore */ }
             });
             if (btnSave && modal) btnSave.addEventListener('click', () => onSettingsSave(modal));
             const extraBtn = $('extraNewBtn');
