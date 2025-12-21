@@ -1551,6 +1551,11 @@
                     // Keep visible but NEVER block clicks/taps on the app.
                     // Also keep it behind modals (modals use z-index: 50).
                     pane.style.cssText = 'position:fixed;left:0;right:0;bottom:0;max-height:30vh;overflow:auto;background:rgba(255,255,255,0.92);border-top:1px solid #ddd;padding:6px 8px;z-index:40;font-size:12px;color:#555;pointer-events:none;';
+                    // Allow selecting text when we temporarily enable pointer-events.
+                    try {
+                        pane.style.userSelect = 'text';
+                        pane.style.webkitUserSelect = 'text';
+                    } catch (e) { /* ignore */ }
                     // In dark theme, keep pane readable
                     try {
                         if (document.body && document.body.dataset && document.body.dataset.theme === 'dark') {
@@ -1559,6 +1564,16 @@
                             pane.style.color = '#bbb';
                         }
                     } catch (e) { /* ignore */ }
+
+                    // Help line (always visible in Fireglass mode)
+                    try {
+                        const help = document.createElement('div');
+                        help.id = 'debugPaneHelp';
+                        help.textContent = 'Fireglass: Alt+Wheel scroll · Hold Alt to select/copy · PageUp/PageDown/Home/End scroll';
+                        help.style.cssText = 'font-size:11px;opacity:0.9;white-space:pre-wrap;word-break:break-word;padding:0 0 6px 0;border-bottom:1px solid currentColor;';
+                        pane.appendChild(help);
+                    } catch (e) { /* ignore */ }
+
                     _debugPane = pane;
                     const attach = () => {
                         if (!_debugPane || !_debugPane.parentNode) document.body.appendChild(_debugPane);
@@ -1571,6 +1586,44 @@
                     // - PageUp/PageDown/Home/End scrolls the pane
                     if (!_debugScrollHandlersInstalled) {
                         _debugScrollHandlersInstalled = true;
+
+                        const setSelectMode = (on) => {
+                            try {
+                                if (!_debugPane) return;
+                                // Default is click-through. In select mode, allow interaction so text can be highlighted/copied.
+                                _debugPane.style.pointerEvents = on ? 'auto' : 'none';
+                                _debugPane.style.cursor = on ? 'text' : 'default';
+                                _debugPane.style.outline = on ? '2px dashed currentColor' : 'none';
+
+                                const helpEl = document.getElementById('debugPaneHelp');
+                                if (helpEl) {
+                                    helpEl.textContent = on
+                                        ? 'Fireglass (SELECT MODE): drag to select, Ctrl+C to copy · Alt+Wheel scroll'
+                                        : 'Fireglass: Alt+Wheel scroll · Hold Alt to select/copy · PageUp/PageDown/Home/End scroll';
+                                }
+                            } catch (e) { /* ignore */ }
+                        };
+
+                        // Toggle select mode while Alt is held down
+                        window.addEventListener('keydown', (e) => {
+                            try {
+                                if (DEBUG_MODE !== 'Fireglass') return;
+                                if (e.key === 'Alt') setSelectMode(true);
+                            } catch { /* ignore */ }
+                        }, true);
+                        window.addEventListener('keyup', (e) => {
+                            try {
+                                if (DEBUG_MODE !== 'Fireglass') return;
+                                if (e.key === 'Alt') setSelectMode(false);
+                            } catch { /* ignore */ }
+                        }, true);
+                        window.addEventListener('blur', () => {
+                            try {
+                                if (DEBUG_MODE !== 'Fireglass') return;
+                                setSelectMode(false);
+                            } catch { /* ignore */ }
+                        });
+
                         window.addEventListener('wheel', (e) => {
                             try {
                                 if (DEBUG_MODE !== 'Fireglass') return;
