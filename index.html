@@ -2606,8 +2606,10 @@
             const baseNewLimit = getSetting('NewItemsPerDay', true);
             const extraNew = Number(payload?.state?.extraNewItems || 0);
             const limitNew = baseNewLimit + extraNew;
-            const servedNew = Number(payload?.state?.servedNewToday || 0);
-            const remainingNew = Math.max(0, limitNew - servedNew);
+            // Track learned-new (answered correctly at least once while new) separately from served.
+            // This makes the counters reflect reality: a card becomes "review" once learned.
+            const learnedNewCount = Number(payload?.state?.learnedNewCount || 0);
+            const remainingNew = Math.max(0, limitNew - learnedNewCount);
 
             let remainingReview = 0;
             for (const row of payload.items) {
@@ -2616,6 +2618,31 @@
                 const due = parseDue_(row[C.due]);
                 const isDue = (due instanceof Date) && ((due.getTime() - MIN_REVIEW_INTERVAL_MS) <= now);
                 if (isDue) remainingReview++;
+            }
+
+            // Ensure each learned-new card increments Review once, without double-counting
+            // if it's already included in the due-based review count.
+            try {
+                const learned = payload?.state?.learnedNewByIndex;
+                if (learned && typeof learned === 'object') {
+                    let learnedAlreadyDue = 0;
+                    for (const k of Object.keys(learned)) {
+                        if (!learned[k]) continue;
+                        const idx = Number(k);
+                        if (!Number.isFinite(idx) || idx < 0 || idx >= payload.items.length) continue;
+                        const row = payload.items[idx];
+                        if (!row || row[C.suspended]) continue;
+                        const due = parseDue_(row[C.due]);
+                        const isDue = (due instanceof Date) && ((due.getTime() - MIN_REVIEW_INTERVAL_MS) <= now);
+                        if (isDue) learnedAlreadyDue++;
+                    }
+                    const extraReview = Math.max(0, learnedNewCount - learnedAlreadyDue);
+                    remainingReview += extraReview;
+                } else {
+                    remainingReview += learnedNewCount;
+                }
+            } catch (e) {
+                remainingReview += learnedNewCount;
             }
             return { remainingNew, remainingReview };
         }
@@ -2628,9 +2655,9 @@
 
             // Build HTML with explicit direction control to prevent RTL/LTR mixing issues
             if (deckName) {
-                el.innerHTML = `<span dir="auto">${deckName}</span><span dir="ltr"> - ${payload.state.answeredCount} answered · New: ${stats.remainingNew} · Review: ${stats.remainingReview}</span>`;
+                el.innerHTML = `<span dir="auto">${deckName}</span><span dir="ltr"> - Answered: ${payload.state.answeredCount}, New: ${stats.remainingNew}, Review: ${stats.remainingReview}</span>`;
             } else {
-                el.textContent = `${payload.state.answeredCount} answered · New: ${stats.remainingNew} · Review: ${stats.remainingReview}`;
+                el.textContent = `Answered: ${payload.state.answeredCount}, New: ${stats.remainingNew}, Review: ${stats.remainingReview}`;
             }
         }
 
@@ -3597,6 +3624,8 @@
                     answeredCount: 0,
                     servedNewToday: 0,
                     extraNewItems: 0,
+                    learnedNewCount: 0,
+                    learnedNewByIndex: {},
                     sessionStatusText: '',
                     _armed: false
                 },
@@ -4007,6 +4036,10 @@
                         answeredCount: 0,
                         servedNewToday: 0,
                         extraNewItems: 0,
+                        learnedNewCount: 0,
+                        learnedNewByIndex: {},
+                        learnedNewCount: 0,
+                        learnedNewByIndex: {},
                         sessionStatusText: '',
                         _armed: false
                     },
@@ -4571,8 +4604,28 @@
             const isCorrect = chosenIndex === correctIndex;
             const row = payload.items[payload.state.currentIndex];
 
-            wasNewBeforeAnswer = row[C.reps] === 0 && row[C.step] === 0;
-            if (wasNewBeforeAnswer) payload.state.servedNewToday++;
+            // Note: sheet values may come as strings (e.g., "0"), so normalize to numbers.
+            const reps0 = Number(row[C.reps] || 0);
+            const step0 = Number(row[C.step] || 0);
+            const due0 = parseDue_(row[C.due]);
+            wasNewBeforeAnswer = (reps0 === 0 && step0 === 0 && !(due0 instanceof Date));
+
+            // Session accounting:
+            // - servedNewToday: used for selection limiting (kept for backward compatibility)
+            // - learnedNewCount: drives the visible "New" counter (decreases only on correct)
+            if (wasNewBeforeAnswer) {
+                payload.state.servedNewToday = Number(payload.state.servedNewToday || 0) + 1;
+                if (isCorrect) {
+                    const idx = Number(payload.state.currentIndex);
+                    payload.state.learnedNewByIndex = (payload.state.learnedNewByIndex && typeof payload.state.learnedNewByIndex === 'object')
+                        ? payload.state.learnedNewByIndex
+                        : {};
+                    if (Number.isFinite(idx) && !payload.state.learnedNewByIndex[idx]) {
+                        payload.state.learnedNewByIndex[idx] = true;
+                        payload.state.learnedNewCount = Number(payload.state.learnedNewCount || 0) + 1;
+                    }
+                }
+            }
 
             updateCardSchedule(row, isCorrect);
             payload.state.answeredCount++;
