@@ -2097,11 +2097,11 @@
                             if (typeof DeckCache !== 'undefined') {
                                 const activeSetName = payload?.activeSet || creds.activeSet || currentCredentials?.activeSet;
                                 const cacheKey = getDeckCacheKey(activeSetName);
+                                if (!cacheKey) throw new Error('No active set cache key');
                                 const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
                                 const cachedSession = {
                                     cards: Array.isArray(payload?.items) ? payload.items.map(r => Array.isArray(r) ? r.slice(0, cardWidth) : []) : [],
                                     userSettings: Array.isArray(settings) ? stripGlobalSettingsFromArray(settings.map(r => Array.isArray(r) ? r.slice() : [])) : stripGlobalSettingsFromArray(payload?.settings || []),
-                                    userPreferences: Array.isArray(userPreferences) ? userPreferences.map(r => Array.isArray(r) ? r.slice() : []) : [],
                                     userProgress: Array.isArray(payload?.items) ? payload.items.map(r => Array.isArray(r) ? r.slice(cardWidth) : []) : [],
                                     setSettings: payload?.setSettings || {}
                                 };
@@ -3617,7 +3617,7 @@
             });
             log_('[buildPayload] Built ' + items.length + ' items');
 
-            const mergedUserPrefs = Array.isArray(sess.userPreferences)
+            const mergedUserPrefs = (Array.isArray(sess.userPreferences) && sess.userPreferences.length)
                 ? sess.userPreferences
                 : (sess.userData
                     ? [
@@ -3689,7 +3689,8 @@
             const stored = currentCredentials && currentCredentials.activeSet
                 ? String(currentCredentials.activeSet).trim()
                 : '';
-            return stored || 'default';
+            // If there's no active set, return empty to signal "no cache key".
+            return stored;
         }
 
         // IndexedDB cache: stores per-deck data
@@ -3832,7 +3833,8 @@
                 // do not persist adminEmail in cached session; use server-provided value when available
                 cards: Array.isArray(deckData?.cards) ? deckData.cards : [],
                 userSettings: Array.isArray(deckData?.userSettings) ? stripGlobalSettingsFromArray(deckData.userSettings) : [],
-                userPreferences: Array.isArray(deckData?.userPreferences) ? deckData.userPreferences.map(r => Array.isArray(r) ? r.slice() : []) : [],
+                // Global preferences come from localStorage.userData/currentCredentials (single source of truth)
+                userPreferences: [],
                 userData: (function () {
                     if (deckData && deckData.userData) return ensureGlobalDefaults(deckData.userData);
                     if (currentCredentials) return ensureGlobalDefaults({ email: currentCredentials.email, ThemeLight: currentCredentials.ThemeLight, AudioAutoPlay: currentCredentials.AudioAutoPlay, PlaybackSpeed: currentCredentials.PlaybackSpeed });
@@ -3879,7 +3881,9 @@
 
             if (!cachedSession) {
                 try {
-                    cachedDeckData = await DeckCache.get(cacheKey);
+                    if (cacheKey) {
+                        cachedDeckData = await DeckCache.get(cacheKey);
+                    }
                     if (cachedDeckData) {
                         cachedSess = buildCachedSession(cachedDeckData, cacheKey);
                         log_('[boot] Found cached session in IndexedDB, using immediately');
@@ -3977,12 +3981,13 @@
                 const deckDataForCache = {
                     cards: Array.isArray(sess.cards) ? sess.cards.map(r => Array.isArray(r) ? r.slice() : []) : [],
                     userSettings: Array.isArray(sess.userSettings) ? stripGlobalSettingsFromArray(sess.userSettings.map(r => Array.isArray(r) ? r.slice() : [])) : [],
-                    userPreferences: Array.isArray(sess.userPreferences) ? sess.userPreferences.map(r => Array.isArray(r) ? r.slice() : []) : [],
                     userProgress: Array.isArray(sess.userProgress) ? sess.userProgress.map(r => Array.isArray(r) ? r.slice() : []) : [],
                     setSettings: sess.setSettings || {},
                     // userData intentionally not persisted to IndexedDB (global user settings are volatile/local)
                 };
-                DeckCache.set(freshKey, deckDataForCache).catch(e => log_('[boot] Cache write failed:', e));
+                if (freshKey) {
+                    DeckCache.set(freshKey, deckDataForCache).catch(e => log_('[boot] Cache write failed:', e));
+                }
                 log_('[boot] Cache updated with fresh data');
 
                 // If we already showed cached data, check if anything changed
@@ -4685,6 +4690,13 @@
             }
 
             updateCardSchedule(row, isCorrect);
+            try {
+                const idx = payload.state.currentIndex;
+                const term = (C && C.term !== undefined) ? String(row[C.term] ?? '') : '';
+                log_(`[schedule] idx=${idx} correct=${isCorrect} step=${row[C.step]} reps=${row[C.reps]} lapses=${row[C.lapses]} nextDue=${row[C.due]} term=${term}`);
+            } catch (e) {
+                // logging only
+            }
             payload.state.answeredCount++;
             log_('[onAnswer] answeredCount=' + payload.state.answeredCount);
             maybeAutosave_();
@@ -5075,7 +5087,11 @@
                 setSettingsOption.addEventListener('click', async (e) => {
                     e.stopPropagation();
                     // show deck-level settings (from IndexedDB if available, fallback to payload.settings)
-                    const active = payload?.activeSet || currentCredentials?.activeSet || getDeckCacheKey();
+                    const active = payload?.activeSet || currentCredentials?.activeSet;
+                    if (!active) {
+                        showToast('No active deck selected', 'error');
+                        return;
+                    }
                     let deckData = null;
                     try {
                         if (typeof DeckCache !== 'undefined' && active) {
