@@ -4859,8 +4859,8 @@
                     } else {
                         draft = [];
                     }
-                    // Remove UserID and global settings from deck-level settings
-                    draft = draft.filter(r => !Array.isArray(r) || String(r[0]) !== 'UserID');
+                    // Remove global settings from deck-level settings. Keep UserID in the data so
+                    // it is persisted, but it will be hidden in the UI by renderSettingsUI().
                     draft = stripGlobalSettingsFromArray(draft);
                     settingsDraft = draft;
                     settingsViewMode = 'set';
