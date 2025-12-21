@@ -2603,6 +2603,12 @@
             }
             const C = payload.schema.lexiconCols || buildLexiconSchema(STUDY_SET_SCHEMA, USER_PROGRESS_SCHEMA);
             const now = Date.now();
+
+            // For the status bar counters, use strict "due now" semantics.
+            // The MIN_REVIEW_INTERVAL_MS window is a study/selection affordance,
+            // but for stats users expect Review to drop once a card is rescheduled.
+            const isDueForStats = (due) => (due instanceof Date) && (due.getTime() <= now);
+
             const baseNewLimit = getSetting('NewItemsPerDay', true);
             const extraNew = Number(payload?.state?.extraNewItems || 0);
             const limitNew = baseNewLimit + extraNew;
@@ -2616,8 +2622,7 @@
                 if (!row) continue;
                 if (row[C.suspended]) continue;
                 const due = parseDue_(row[C.due]);
-                const isDue = (due instanceof Date) && ((due.getTime() - MIN_REVIEW_INTERVAL_MS) <= now);
-                if (isDue) remainingReview++;
+                if (isDueForStats(due)) remainingReview++;
             }
 
             // Ensure each learned-new card increments Review once, without double-counting
@@ -2633,8 +2638,7 @@
                         const row = payload.items[idx];
                         if (!row || row[C.suspended]) continue;
                         const due = parseDue_(row[C.due]);
-                        const isDue = (due instanceof Date) && ((due.getTime() - MIN_REVIEW_INTERVAL_MS) <= now);
-                        if (isDue) learnedAlreadyDue++;
+                        if (isDueForStats(due)) learnedAlreadyDue++;
                     }
                     const extraReview = Math.max(0, learnedNewCount - learnedAlreadyDue);
                     remainingReview += extraReview;
@@ -4081,23 +4085,33 @@
                 }
             }
 
-            let earliestDueIndex = -1;
-            let earliestDueTime = Number.POSITIVE_INFINITY;
+            // Review selection:
+            // Choose the earliest due time among all cards due within the ReviewAhead window.
+            // ReviewAhead is implemented as "allow scheduling up to MIN_REVIEW_INTERVAL_MS early".
+            // This is just a shift; selection is still by earliest due.
+
+            const reviewAheadUntil = now + MIN_REVIEW_INTERVAL_MS;
+            let earliestIndex = -1;
+            let earliestTime = Number.POSITIVE_INFINITY;
+
             for (let i = 0; i < items.length; i++) {
                 const row = items[i];
                 if (!row) continue;
-                const suspended = !!row[C.suspended];
-                if (suspended) continue;
+                if (row[C.suspended]) continue;
+
                 const due = parseDue_(row[C.due]);
                 if (!(due instanceof Date)) continue;
                 const dueMs = due.getTime();
-                if ((dueMs - MIN_REVIEW_INTERVAL_MS) <= now && dueMs < earliestDueTime) {
-                    earliestDueTime = dueMs;
-                    earliestDueIndex = i;
+                if (!Number.isFinite(dueMs)) continue;
+
+                if (dueMs <= reviewAheadUntil && dueMs < earliestTime) {
+                    earliestTime = dueMs;
+                    earliestIndex = i;
                 }
             }
-            log_('[decideNextIndex] Result index=' + earliestDueIndex);
-            return earliestDueIndex;
+
+            log_('[decideNextIndex] Result index=' + earliestIndex);
+            return earliestIndex;
         }
 
         function getDistractorColumnIndices() {
@@ -4595,7 +4609,22 @@
             const delay = (due > 0) ? (now - due) / 86400000 : 0;
             const scale = Math.min(2, Math.max(0.5, 1 + 0.3 * (delay / denom)));
             const nextDue = new Date(now + Inext * scale * 86400000);
-            row[C.due] = `${nextDue.getUTCFullYear()}-${String(nextDue.getUTCMonth() + 1).padStart(2, '0')}-${String(nextDue.getUTCDate()).padStart(2, '0')}`;
+
+            // Preserve time-of-day for sub-day intervals (e.g. 1/1440 = 1 minute).
+            // Without this, all intra-day schedules collapse to the same YYYY-MM-DD,
+            // causing repeated reviews of the same earliest-index card.
+            const pad2 = (n) => String(n).padStart(2, '0');
+            const yyyy = nextDue.getUTCFullYear();
+            const mm = pad2(nextDue.getUTCMonth() + 1);
+            const dd = pad2(nextDue.getUTCDate());
+            if (Number(Inext) > 0 && Number(Inext) < 1) {
+                const hh = pad2(nextDue.getUTCHours());
+                const mi = pad2(nextDue.getUTCMinutes());
+                const ss = pad2(nextDue.getUTCSeconds());
+                row[C.due] = `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}Z`;
+            } else {
+                row[C.due] = `${yyyy}-${mm}-${dd}`;
+            }
         }
 
         function onAnswer(chosenIndex, correctIndex) {
