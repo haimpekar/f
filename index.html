@@ -1541,6 +1541,7 @@
         }
 
         let _debugPane = null;
+        let _debugScrollHandlersInstalled = false;
         function debug(msg) {
             // Fireglass-safe: writes to DOM so you can inspect without DevTools.
             try {
@@ -1564,6 +1565,35 @@
                     };
                     if (document.body) attach();
                     else window.addEventListener('DOMContentLoaded', attach, { once: true });
+
+                    // Allow scrolling the debug pane without making it intercept clicks:
+                    // - Alt + mouse wheel scrolls the pane
+                    // - PageUp/PageDown/Home/End scrolls the pane
+                    if (!_debugScrollHandlersInstalled) {
+                        _debugScrollHandlersInstalled = true;
+                        window.addEventListener('wheel', (e) => {
+                            try {
+                                if (DEBUG_MODE !== 'Fireglass') return;
+                                if (!_debugPane) return;
+                                // Only when user explicitly intends to scroll logs
+                                if (!e.altKey) return;
+                                e.preventDefault();
+                                _debugPane.scrollTop += e.deltaY;
+                            } catch { /* ignore */ }
+                        }, { passive: false });
+
+                        window.addEventListener('keydown', (e) => {
+                            try {
+                                if (DEBUG_MODE !== 'Fireglass') return;
+                                if (!_debugPane) return;
+                                const step = Math.max(40, Math.round((_debugPane.clientHeight || 200) * 0.25));
+                                if (e.key === 'PageUp') { e.preventDefault(); _debugPane.scrollTop -= step; }
+                                else if (e.key === 'PageDown') { e.preventDefault(); _debugPane.scrollTop += step; }
+                                else if (e.key === 'Home') { e.preventDefault(); _debugPane.scrollTop = 0; }
+                                else if (e.key === 'End') { e.preventDefault(); _debugPane.scrollTop = _debugPane.scrollHeight; }
+                            } catch { /* ignore */ }
+                        });
+                    }
                 }
                 const el = document.createElement('div');
                 el.textContent = String(msg);
