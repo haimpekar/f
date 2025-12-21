@@ -1540,11 +1540,23 @@
             DEBUG_MODE = (m === 'No' || m === 'Regular' || m === 'Fireglass') ? m : 'Regular';
         }
 
+        function formatTs_() {
+            try {
+                const d = new Date();
+                const pad2 = (n) => String(n).padStart(2, '0');
+                const pad3 = (n) => String(n).padStart(3, '0');
+                return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}.${pad3(d.getMilliseconds())}`;
+            } catch {
+                return '';
+            }
+        }
+
         let _debugPane = null;
         let _debugScrollHandlersInstalled = false;
         function debug(msg) {
             // Fireglass-safe: writes to DOM so you can inspect without DevTools.
             try {
+                const ts = formatTs_();
                 if (!_debugPane) {
                     const pane = document.createElement('div');
                     pane.id = 'debugPane';
@@ -1649,7 +1661,7 @@
                     }
                 }
                 const el = document.createElement('div');
-                el.textContent = String(msg);
+                el.textContent = ts ? `${ts} ${String(msg)}` : String(msg);
                 el.style.cssText = 'font-size:12px;color:inherit;opacity:0.95;white-space:pre-wrap;word-break:break-word;';
                 _debugPane.appendChild(el);
                 // Keep latest visible
@@ -1661,6 +1673,7 @@
 
         function log_(...args) {
             if (DEBUG_MODE === 'No') return;
+            const ts = formatTs_();
             const parts = args.map(a => {
                 if (a instanceof Error) return `${a.message}\n${a.stack || ''}`.trim();
                 if (typeof a === 'string') return a;
@@ -1668,10 +1681,10 @@
             });
             const line = parts.join(' ');
             if (DEBUG_MODE === 'Fireglass') {
-                debug('[DEBUG] ' + line);
+                debug(`[DEBUG] ${line}`);
                 return;
             }
-            try { console.log('[DEBUG]', ...args); } catch (e) { /* ignore */ }
+            try { console.log(ts, '[DEBUG]', ...args); } catch (e) { /* ignore */ }
         }
         function logBackendDebug(entries, label) {
             if (!Array.isArray(entries) || entries.length === 0) return;
@@ -1975,6 +1988,7 @@
                 this.queue = [];
                 this.processing = false;
                 localStorage.removeItem('saveQueue');
+                log_('[SaveQueue] cleared');
             },
 
             add(saveType, data) {
@@ -1995,18 +2009,24 @@
                 // Deduplicate: remove older saves of same type
                 const typeKey = saveType;
                 if (saveType === 'progress' || saveType === 'deckSettings' || saveType === 'userPreferences') {
+                    const before = this.queue.length;
                     this.queue = this.queue.filter(item => item.typeKey !== typeKey);
+                    const removed = before - this.queue.length;
+                    if (removed > 0) log_(`[SaveQueue] dedup removed=${removed} type=${typeKey}`);
                 }
 
                 const item = { saveType, typeKey, data, credentials, attempts: 0, timestamp: Date.now() };
                 this.queue.push(item);
                 localStorage.setItem('saveQueue', JSON.stringify(this.queue));
+                log_(`[SaveQueue] queued type=${typeKey} qlen=${this.queue.length}`);
                 this.process();
             },
 
             async process() {
                 if (this.processing || this.queue.length === 0) return;
                 this.processing = true;
+
+                log_(`[SaveQueue] process start qlen=${this.queue.length}`);
 
                 while (this.queue.length > 0) {
                     const item = this.queue[0];
@@ -2027,6 +2047,7 @@
                     }
 
                     try {
+                        log_(`[SaveQueue] saving type=${item.typeKey} attempt=${item.attempts + 1} qlen=${this.queue.length}`);
                         await service.saveSession({
                             userId: creds.userId,
                             password: creds.password,
@@ -2036,6 +2057,7 @@
                         this.queue.shift();
                         localStorage.setItem('saveQueue', JSON.stringify(this.queue));
                         showToast(`Saved ${item.saveType}`);
+                        log_(`[SaveQueue] saved type=${item.typeKey} remaining=${this.queue.length}`);
 
                         // Update local IndexedDB cache (DeckCache) so cached session
                         // reflects the newly-saved settings/progress immediately.
@@ -2063,6 +2085,7 @@
                             log_('[SaveQueue] Failed after 3 attempts:', item.saveType, err);
                             showToast(`Failed to save ${item.saveType}`, 'error');
                             this.queue.shift();
+                            log_(`[SaveQueue] dropped type=${item.typeKey} remaining=${this.queue.length}`);
                         } else {
                             log_(`[SaveQueue] Retry ${item.attempts}/3 for ${item.saveType}:`, err.message);
                             await new Promise(r => setTimeout(r, 1000 * item.attempts));
@@ -2072,6 +2095,7 @@
                 }
 
                 this.processing = false;
+                log_('[SaveQueue] process done');
             },
 
             restore() {
