@@ -2420,82 +2420,108 @@
             const answered = payload?.state?.answeredCount || 0;
             if (answered - _lastSavedAnswerCount < AUTOSAVE_EVERY) return;
 
-            _lastSavedAnswerCount = answered;
-            const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
-            const userProgress = payload.items.map(row => row.slice(cardWidth));
-
-            SaveQueue.add('progress', {
-                saveType: 'progress',
-                data: userProgress
-            });
-
-            // If daily-cap changed recently, flush it alongside progress autosaves.
+            // Buffer-full flush: persist pending changes now.
             try {
-                flushDailyCapIfDirty_('autosave');
+                flushPendingSaves_('count', { forceProgress: true });
             } catch (e) {
                 // ignore
             }
         }
 
-        // Daily cap persistence:
-        // - Update the in-memory settings immediately (so UI/gating is instant)
-        // - Persist to backend in a throttled manner to avoid excessive writes
-        const DAILY_CAP_FLUSH_DELAY_MS = 15000;
-        let _dailyCapFlushTimer = null;
+        // Straightforward save policy (fast UI, fewer writes):
+        // - Keep changes in memory immediately
+        // - Persist in the background on buffer fill OR after a timeout, whichever comes first
+        // - Also persist on tab hide/unload
+        const PENDING_SAVE_FLUSH_DELAY_MS = 15000;
+        let _pendingSaveFlushTimer = null;
+
+        function schedulePendingSaveFlush_() {
+            try {
+                if (_pendingSaveFlushTimer) return;
+                _pendingSaveFlushTimer = setTimeout(() => {
+                    _pendingSaveFlushTimer = null;
+                    flushPendingSaves_('timer');
+                    // If more changes accumulated while saving, schedule another tick.
+                    if (payload?.state?._progressDirty || payload?.state?._dailyCapDirty) {
+                        schedulePendingSaveFlush_();
+                    }
+                }, PENDING_SAVE_FLUSH_DELAY_MS);
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        function markProgressDirty_() {
+            try {
+                if (!payload || payload?._isMock) return;
+                if (!payload.state || typeof payload.state !== 'object') payload.state = {};
+                payload.state._progressDirty = true;
+                schedulePendingSaveFlush_();
+            } catch (e) {
+                // ignore
+            }
+        }
 
         function markDailyCapDirty_() {
             try {
                 if (!payload || payload?._isMock) return;
                 if (!payload.state || typeof payload.state !== 'object') payload.state = {};
                 payload.state._dailyCapDirty = true;
-                scheduleDailyCapFlush_();
+                schedulePendingSaveFlush_();
             } catch (e) {
                 // ignore
             }
         }
 
-        function scheduleDailyCapFlush_() {
+        function flushPendingSaves_(reason = '', { forceProgress = false } = {}) {
             try {
-                if (_dailyCapFlushTimer) {
-                    clearTimeout(_dailyCapFlushTimer);
-                    _dailyCapFlushTimer = null;
+                if (!payload || payload?._isMock) return { progress: false, dailyCap: false };
+                if (!payload.state || typeof payload.state !== 'object') payload.state = {};
+
+                const answered = Number(payload.state.answeredCount || 0);
+                const progressDirty = !!payload.state._progressDirty;
+                const dailyCapDirty = !!payload.state._dailyCapDirty;
+
+                let didProgress = false;
+                let didDailyCap = false;
+
+                if (forceProgress || progressDirty) {
+                    // Avoid re-sending the same snapshot if nothing changed since last save.
+                    if (forceProgress || (answered > _lastSavedAnswerCount)) {
+                        const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
+                        const userProgress = payload.items.map(row => row.slice(cardWidth));
+                        SaveQueue.add('progress', { saveType: 'progress', data: userProgress });
+                        _lastSavedAnswerCount = answered;
+                        didProgress = true;
+                    }
+                    payload.state._progressDirty = false;
                 }
-                _dailyCapFlushTimer = setTimeout(() => {
-                    _dailyCapFlushTimer = null;
-                    flushDailyCapIfDirty_('timer');
-                }, DAILY_CAP_FLUSH_DELAY_MS);
+
+                if (dailyCapDirty) {
+                    const deckOnly = stripGlobalSettingsFromArray(settings || []);
+                    SaveQueue.add('deckSettings', { saveType: 'deckSettings', data: deckOnly }, { silent: true });
+                    payload.state._dailyCapDirty = false;
+                    didDailyCap = true;
+                }
+
+                return { progress: didProgress, dailyCap: didDailyCap };
             } catch (e) {
-                // ignore
+                return { progress: false, dailyCap: false };
             }
         }
 
-        function flushDailyCapIfDirty_(reason = '') {
+        (function installPendingSaveFlushHooks_() {
             try {
-                if (!payload || payload?._isMock) return false;
-                const dirty = !!payload?.state?._dailyCapDirty;
-                if (!dirty) return false;
+                if (window.__pendingSaveHooksInstalled) return;
+                window.__pendingSaveHooksInstalled = true;
 
-                const deckOnly = stripGlobalSettingsFromArray(settings || []);
-                SaveQueue.add('deckSettings', { saveType: 'deckSettings', data: deckOnly }, { silent: true });
-                payload.state._dailyCapDirty = false;
-                return true;
-            } catch (e) {
-                return false;
-            }
-        }
-
-        (function installDailyCapFlushHooks_() {
-            try {
-                if (window.__dailyCapHooksInstalled) return;
-                window.__dailyCapHooksInstalled = true;
-
-                // Flush on tab hide / navigation / reload so daily cap survives reload.
+                // Flush on tab hide / navigation / reload so pending changes survive reload.
                 window.addEventListener('beforeunload', () => {
-                    try { flushDailyCapIfDirty_('beforeunload'); } catch (e) { }
+                    try { flushPendingSaves_('beforeunload', { forceProgress: true }); } catch (e) { }
                 });
                 document.addEventListener('visibilitychange', () => {
                     try {
-                        if (document.visibilityState === 'hidden') flushDailyCapIfDirty_('hidden');
+                        if (document.visibilityState === 'hidden') flushPendingSaves_('hidden', { forceProgress: true });
                     } catch (e) { }
                 });
             } catch (e) {
@@ -4934,6 +4960,7 @@
             }
             payload.state.answeredCount++;
             log_('[onAnswer] answeredCount=' + payload.state.answeredCount);
+            try { markProgressDirty_(); } catch (e) { }
             maybeAutosave_();
             showFeedback_(chosenIndex, correctIndex);
         }
