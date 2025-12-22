@@ -2487,7 +2487,7 @@
 
                 if (forceProgress || progressDirty) {
                     // Avoid re-sending the same snapshot if nothing changed since last save.
-                    if (forceProgress || (answered > _lastSavedAnswerCount)) {
+                    if (answered > _lastSavedAnswerCount) {
                         const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
                         const userProgress = payload.items.map(row => row.slice(cardWidth));
                         SaveQueue.add('progress', { saveType: 'progress', data: userProgress });
@@ -2517,11 +2517,11 @@
 
                 // Flush on tab hide / navigation / reload so pending changes survive reload.
                 window.addEventListener('beforeunload', () => {
-                    try { flushPendingSaves_('beforeunload', { forceProgress: true }); } catch (e) { }
+                    try { flushPendingSaves_('beforeunload'); } catch (e) { }
                 });
                 document.addEventListener('visibilitychange', () => {
                     try {
-                        if (document.visibilityState === 'hidden') flushPendingSaves_('hidden', { forceProgress: true });
+                        if (document.visibilityState === 'hidden') flushPendingSaves_('hidden');
                     } catch (e) { }
                 });
             } catch (e) {
