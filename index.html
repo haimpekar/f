@@ -2027,7 +2027,7 @@
                 log_('[SaveQueue] cleared');
             },
 
-            add(saveType, data) {
+            add(saveType, data, options = {}) {
                 // Capture credentials NOW to avoid null reference when process() runs later
                 const credentials = {
                     userId: currentCredentials?.email,
@@ -2051,7 +2051,8 @@
                     if (removed > 0) log_(`[SaveQueue] dedup removed=${removed} type=${typeKey}`);
                 }
 
-                const item = { saveType, typeKey, data, credentials, attempts: 0, timestamp: Date.now() };
+                const silent = !!(options && options.silent);
+                const item = { saveType, typeKey, data, credentials, attempts: 0, timestamp: Date.now(), silent };
                 this.queue.push(item);
                 localStorage.setItem('saveQueue', JSON.stringify(this.queue));
                 log_(`[SaveQueue] queued type=${typeKey} qlen=${this.queue.length}`);
@@ -2092,7 +2093,7 @@
                         });
                         this.queue.shift();
                         localStorage.setItem('saveQueue', JSON.stringify(this.queue));
-                        showToast(`Saved ${item.saveType}`);
+                        if (!item.silent) showToast(`Saved ${item.saveType}`);
                         log_(`[SaveQueue] saved type=${item.typeKey} remaining=${this.queue.length}`);
 
                         // Update local IndexedDB cache (DeckCache) so cached session
@@ -2119,7 +2120,7 @@
                         item.attempts++;
                         if (item.attempts >= 3) {
                             log_('[SaveQueue] Failed after 3 attempts:', item.saveType, err);
-                            showToast(`Failed to save ${item.saveType}`, 'error');
+                            if (!item.silent) showToast(`Failed to save ${item.saveType}`, 'error');
                             this.queue.shift();
                             log_(`[SaveQueue] dropped type=${item.typeKey} remaining=${this.queue.length}`);
                         } else {
@@ -2427,7 +2428,80 @@
                 saveType: 'progress',
                 data: userProgress
             });
+
+            // If daily-cap changed recently, flush it alongside progress autosaves.
+            try {
+                flushDailyCapIfDirty_('autosave');
+            } catch (e) {
+                // ignore
+            }
         }
+
+        // Daily cap persistence:
+        // - Update the in-memory settings immediately (so UI/gating is instant)
+        // - Persist to backend in a throttled manner to avoid excessive writes
+        const DAILY_CAP_FLUSH_DELAY_MS = 15000;
+        let _dailyCapFlushTimer = null;
+
+        function markDailyCapDirty_() {
+            try {
+                if (!payload || payload?._isMock) return;
+                if (!payload.state || typeof payload.state !== 'object') payload.state = {};
+                payload.state._dailyCapDirty = true;
+                scheduleDailyCapFlush_();
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        function scheduleDailyCapFlush_() {
+            try {
+                if (_dailyCapFlushTimer) {
+                    clearTimeout(_dailyCapFlushTimer);
+                    _dailyCapFlushTimer = null;
+                }
+                _dailyCapFlushTimer = setTimeout(() => {
+                    _dailyCapFlushTimer = null;
+                    flushDailyCapIfDirty_('timer');
+                }, DAILY_CAP_FLUSH_DELAY_MS);
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        function flushDailyCapIfDirty_(reason = '') {
+            try {
+                if (!payload || payload?._isMock) return false;
+                const dirty = !!payload?.state?._dailyCapDirty;
+                if (!dirty) return false;
+
+                const deckOnly = stripGlobalSettingsFromArray(settings || []);
+                SaveQueue.add('deckSettings', { saveType: 'deckSettings', data: deckOnly }, { silent: true });
+                payload.state._dailyCapDirty = false;
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        (function installDailyCapFlushHooks_() {
+            try {
+                if (window.__dailyCapHooksInstalled) return;
+                window.__dailyCapHooksInstalled = true;
+
+                // Flush on tab hide / navigation / reload so daily cap survives reload.
+                window.addEventListener('beforeunload', () => {
+                    try { flushDailyCapIfDirty_('beforeunload'); } catch (e) { }
+                });
+                document.addEventListener('visibilitychange', () => {
+                    try {
+                        if (document.visibilityState === 'hidden') flushDailyCapIfDirty_('hidden');
+                    } catch (e) { }
+                });
+            } catch (e) {
+                // ignore
+            }
+        })();
 
         function parseDue_(v) {
             if (!v) return 0;
@@ -2839,7 +2913,7 @@
             if (persist && changed && !payload?._isMock) {
                 try {
                     const deckOnly = stripGlobalSettingsFromArray(settings || []);
-                    SaveQueue.add('deckSettings', { saveType: 'deckSettings', data: deckOnly });
+                    SaveQueue.add('deckSettings', { saveType: 'deckSettings', data: deckOnly }, { silent: true });
                 } catch (e) {
                     log_('[DailyCap] persist failed:', e);
                 }
@@ -4838,8 +4912,7 @@
 
                             if (!payload?._isMock) {
                                 if (okDay1 && okCnt1) {
-                                    const deckOnly = stripGlobalSettingsFromArray(settings || []);
-                                    SaveQueue.add('deckSettings', { saveType: 'deckSettings', data: deckOnly });
+                                    markDailyCapDirty_();
                                 } else {
                                     showToast('Daily cap cannot persist: add 2 empty deck settings rows', 'error');
                                 }
