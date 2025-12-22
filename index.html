@@ -1468,6 +1468,10 @@
             tags: 5
         };
 
+        // Global default Ladder (hardcoded for now)
+        // Deck (per-set) Ladder may be empty; in that case, we fall back to this.
+        const DEFAULT_LADDER_STR = '{1/1440;3/1440;10/1440;30/1440;12/24;2;4;7;14;30;60;90;105;115;120}';
+
         const MOCK_ITEMS = [
             ['האם אוטובוס הנוסע בנתיב שיועד לתחבורה ציבורית רשאי לעקוף רכב עוקף?', '', 'חוקי התנועה', 'רשאי.', 'רשאי, רק בדרך שאינה עירונית.', 'רשאי, רק כאשר הרכב העוקף הוא רכב משא.', 'רשאי, אם באוטובוס אין נוסעים.'],
             ['האם מותר לנהוג ברכב כבד כאשר לחץ האוויר במערכת הבלימה נמוך מן המינימום הנדרש?', '', 'חוקי התנועה', 'אסור.', 'מותר, אבל רק באישור שוטר או קצין.', 'מותר, אבל רק אם יכולת העצירה של הרכב טובה.', 'מותר, אם ברור לחלוטין שאין דליפה.'],
@@ -1488,7 +1492,7 @@
             AudioEnabled: true,
             AudioOnly: false,
             DistractorsAsReference: false,
-            Ladder: '{1/1440;1/1440;3/1440;3/1440;10/1440;10/1440;30/1440;30/1440;12/24;2;4;7;14;30;60;90;105;115;120}',
+            Ladder: DEFAULT_LADDER_STR,
             Lang: 'he'
         };
 
@@ -2478,6 +2482,26 @@
             }).map(d => Math.max(0, d));
         }
 
+        function getEffectiveDeckLadderString_(setSettings) {
+            try {
+                const raw = (setSettings && Object.prototype.hasOwnProperty.call(setSettings, 'Ladder'))
+                    ? String(setSettings.Ladder || '')
+                    : '';
+
+                const parsed = parseLadder_(raw);
+                const isValid = Array.isArray(parsed) && parsed.length > 0 && parsed.some(v => Number.isFinite(v) && v > 0);
+                return isValid ? raw : DEFAULT_LADDER_STR;
+            } catch {
+                return DEFAULT_LADDER_STR;
+            }
+        }
+
+        function getEffectiveDeckLadder_(setSettings) {
+            const ladder = parseLadder_(getEffectiveDeckLadderString_(setSettings));
+            // Defensive: should never be empty because DEFAULT_LADDER_STR is non-empty.
+            return (Array.isArray(ladder) && ladder.length > 0) ? ladder : [1];
+        }
+
 
         let _audioEnabled = false;
         let _currentAudioUrl = '';
@@ -2645,10 +2669,13 @@
             const baseNewLimit = getSetting('NewItemsPerDay', true);
             const extraNew = Number(payload?.state?.extraNewItems || 0);
             const limitNew = baseNewLimit + extraNew;
-            // Track learned-new (answered correctly at least once while new) separately from served.
-            // This makes the counters reflect reality: a card becomes "review" once learned.
+            // Persisted daily cap counter (deck setting) so New survives reloads.
+            const dailyLearned = Number(getSettingSafe_('DailyNewCount', 0, true) || 0);
+            const remainingNew = Math.max(0, limitNew - (Number.isFinite(dailyLearned) ? dailyLearned : 0));
+
+            // Session-only learned-new count: used only to make Review reflect newly-learned cards
+            // that were rescheduled into the future during *this* run.
             const learnedNewCount = Number(payload?.state?.learnedNewCount || 0);
-            const remainingNew = Math.max(0, limitNew - learnedNewCount);
 
             let remainingReview = 0;
             for (const row of payload.items) {
@@ -2744,6 +2771,83 @@
             return rows;
         }
 
+        function getLocalDayKey_() {
+            const d = new Date();
+            const pad2 = (n) => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+        }
+
+        function getSettingSafe_(name, fallbackValue, asNumber = false) {
+            try {
+                return getSetting(name, asNumber);
+            } catch (e) {
+                return fallbackValue;
+            }
+        }
+
+        // Deck settings (sheet-backed) are a fixed-size matrix (rows between row 2 and the header).
+        // Only overwrite existing keys or fill empty slots; do NOT grow unless explicitly allowed (mock mode).
+        function setMatrixValueFixed_(rows, name, value, { allowGrow = false } = {}) {
+            if (!Array.isArray(rows) || !name) return false;
+            const key = String(name);
+            const idx = rows.findIndex(r => Array.isArray(r) && String(r[0]) === key);
+            if (idx >= 0) {
+                rows[idx][1] = value;
+                return true;
+            }
+            const emptyIdx = rows.findIndex(r => Array.isArray(r) && !String(r[0] ?? '').trim());
+            if (emptyIdx >= 0) {
+                rows[emptyIdx][0] = key;
+                rows[emptyIdx][1] = value;
+                return true;
+            }
+            if (allowGrow) {
+                rows.push([key, value]);
+                return true;
+            }
+            return false;
+        }
+
+        function normalizeDailyNewCap_({ persist = false } = {}) {
+            if (!payload) return false;
+            if (!Array.isArray(settings)) return false;
+            const todayKey = getLocalDayKey_();
+            const allowGrow = !!payload?._isMock;
+
+            const storedDay = String(getSettingSafe_('DailyNewDayKey', '', false) || '').trim();
+            const storedCountRaw = Number(getSettingSafe_('DailyNewCount', 0, true) || 0);
+            const storedCount = Number.isFinite(storedCountRaw) ? storedCountRaw : 0;
+            const needsReset = !storedDay || storedDay !== todayKey;
+
+            let changed = false;
+            if (needsReset) {
+                changed = setMatrixValueFixed_(settings, 'DailyNewDayKey', todayKey, { allowGrow }) || changed;
+                changed = setMatrixValueFixed_(settings, 'DailyNewCount', 0, { allowGrow }) || changed;
+                if (Array.isArray(payload.settings)) {
+                    changed = setMatrixValueFixed_(payload.settings, 'DailyNewDayKey', todayKey, { allowGrow }) || changed;
+                    changed = setMatrixValueFixed_(payload.settings, 'DailyNewCount', 0, { allowGrow }) || changed;
+                }
+            } else {
+                changed = setMatrixValueFixed_(settings, 'DailyNewDayKey', storedDay, { allowGrow }) || changed;
+                changed = setMatrixValueFixed_(settings, 'DailyNewCount', storedCount, { allowGrow }) || changed;
+                if (Array.isArray(payload.settings)) {
+                    changed = setMatrixValueFixed_(payload.settings, 'DailyNewDayKey', storedDay, { allowGrow }) || changed;
+                    changed = setMatrixValueFixed_(payload.settings, 'DailyNewCount', storedCount, { allowGrow }) || changed;
+                }
+            }
+
+            if (persist && changed && !payload?._isMock) {
+                try {
+                    const deckOnly = stripGlobalSettingsFromArray(settings || []);
+                    SaveQueue.add('deckSettings', { saveType: 'deckSettings', data: deckOnly });
+                } catch (e) {
+                    log_('[DailyCap] persist failed:', e);
+                }
+            }
+
+            return changed;
+        }
+
         function applyLiveSettingPreview_(name, value) {
             try {
                 // Always mirror into the live combined settings matrix used by getSetting()
@@ -2818,6 +2922,7 @@
                     const name = String(row[0] || '').trim();
                     if (!name) return false;
                     if (name === 'UserID' || name === 'Setting' || name === 'Password') return false; // hide header/user rows
+                    if (name === 'DailyNewDayKey' || name === 'DailyNewCount') return false; // hide daily cap rows
                     return true;
                 };
                 const autoNewCtx = { newCtrl: null, newRow: null, dueCtrl: null };
@@ -3929,6 +4034,10 @@
                         payload = buildPayload(cachedSess);
                         settings = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
                         userPreferences = payload.userPreferences ? payload.userPreferences.map(r => Array.isArray(r) ? r.slice() : []) : [];
+
+                        // Persisted daily cap: ensure keys exist and reset on day rollover.
+                        normalizeDailyNewCap_({ persist: true });
+
                         renderSettingsUI({ settings });
                         // Preview the theme using the draft (if available) rather than current stored value
                         try {
@@ -4002,6 +4111,10 @@
                         payload = buildPayload(sess);
                         settings = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
                         userPreferences = payload.userPreferences ? payload.userPreferences.map(r => Array.isArray(r) ? r.slice() : []) : [];
+
+                        // Persisted daily cap: ensure keys exist and reset on day rollover.
+                        normalizeDailyNewCap_({ persist: true });
+
                         renderSettingsUI({ settings });
                         applyTheme();
                         autoAdjustNewItemsPerDay();
@@ -4041,6 +4154,10 @@
                 userPreferences = payload.userPreferences ? payload.userPreferences.map(r => Array.isArray(r) ? r.slice() : []) : [];
                 log_('[boot] Active settings copied, length=' + settings.length);
                 log_('[boot] Active settings:', JSON.stringify(settings));
+
+                // Persisted daily cap: ensure keys exist and reset on day rollover.
+                normalizeDailyNewCap_({ persist: true });
+
                 renderSettingsUI({ settings });
                 applyTheme();
                 autoAdjustNewItemsPerDay();
@@ -4089,6 +4206,10 @@
                 };
                 settings = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
                 userPreferences = payload.userPreferences ? payload.userPreferences.map(r => Array.isArray(r) ? r.slice() : []) : [];
+
+                // Persisted daily cap (mock): ensure keys exist/reset; do not persist.
+                normalizeDailyNewCap_({ persist: false });
+
                 renderSettingsUI({ settings });
                 applyTheme();
                 $('quizArea').classList.remove('hidden');
@@ -4107,7 +4228,8 @@
             const limitNew = baseNewLimit + (Number.isFinite(extraNew) ? extraNew : 0);
             const now = Date.now();
             const items = payload.items;
-            log_('[decideNextIndex] limitNew=' + limitNew + ' servedNew=' + payload.state.servedNewToday);
+            const dailyLearned = Number(getSettingSafe_('DailyNewCount', 0, true) || 0);
+            log_('[decideNextIndex] limitNew=' + limitNew + ' dailyLearned=' + dailyLearned);
 
             for (let i = 0; i < items.length; i++) {
                 const row = items[i];
@@ -4117,7 +4239,7 @@
                 const step = Number(row[C.step] || 0);
                 const due = parseDue_(row[C.due]);
                 const isNew = (reps === 0 && step === 0 && !(due instanceof Date));
-                if (!suspended && isNew && payload.state.servedNewToday < limitNew) {
+                if (!suspended && isNew && dailyLearned < limitNew) {
                     log_('[decideNextIndex] Found new card at index ' + i);
                     return i;
                 }
@@ -4630,20 +4752,32 @@
         function updateCardSchedule(row, isCorrect) {
             const C = payload.schema.lexiconCols;
             const setSettings = payload?.setSettings || MOCK_SET_SETTINGS || {};
-            const ladder = parseLadder_(setSettings.Ladder || '');
+            const ladder = getEffectiveDeckLadder_(setSettings);
             const now = Date.now();
-            const denom = ladder[Math.min(row[C.step], ladder.length - 1)] || 1;
+            const step0 = Number(row[C.step] || 0);
+            const reps0 = Number(row[C.reps] || 0);
+            const lapses0 = Number(row[C.lapses] || 0);
+            const stepIdx0 = Math.max(0, Math.min(Number.isFinite(step0) ? step0 : 0, ladder.length - 1));
+            const denom = ladder[stepIdx0] || 1;
             const due = parseDue_(row[C.due]);
 
-            if (isCorrect) {
-                row[C.step] = Math.min(row[C.step] + 1, ladder.length - 1);
-            } else {
-                row[C.step] = 0;
-                row[C.lapses]++;
-            }
-            row[C.reps]++;
+            let step = stepIdx0;
+            let reps = Number.isFinite(reps0) ? reps0 : 0;
+            let lapses = Number.isFinite(lapses0) ? lapses0 : 0;
 
-            const Inext = ladder[row[C.step]];
+            if (isCorrect) {
+                step = Math.min(step + 1, ladder.length - 1);
+            } else {
+                step = 0;
+                lapses++;
+            }
+            reps++;
+
+            row[C.step] = step;
+            row[C.reps] = reps;
+            row[C.lapses] = lapses;
+
+            const Inext = ladder[step] || 0;
             const delay = (due > 0) ? (now - due) / 86400000 : 0;
             const scale = Math.min(2, Math.max(0.5, 1 + 0.3 * (delay / denom)));
             const nextDue = new Date(now + Inext * scale * 86400000);
@@ -4673,8 +4807,9 @@
             wasNewBeforeAnswer = (reps0 === 0 && step0 === 0 && !(due0 instanceof Date));
 
             // Session accounting:
-            // - servedNewToday: used for selection limiting (kept for backward compatibility)
-            // - learnedNewCount: drives the visible "New" counter (decreases only on correct)
+            // - servedNewToday: legacy (selection now uses persisted DailyNewCount)
+            // - learnedNewCount: session-only (used to bump Review immediately after learning)
+            // - DailyNewCount: persisted daily cap counter (deck setting; survives reloads)
             if (wasNewBeforeAnswer) {
                 payload.state.servedNewToday = Number(payload.state.servedNewToday || 0) + 1;
                 if (isCorrect) {
@@ -4685,6 +4820,33 @@
                     if (Number.isFinite(idx) && !payload.state.learnedNewByIndex[idx]) {
                         payload.state.learnedNewByIndex[idx] = true;
                         payload.state.learnedNewCount = Number(payload.state.learnedNewCount || 0) + 1;
+
+                        // Persisted daily cap: increment DailyNewCount for today's day-key.
+                        try {
+                            normalizeDailyNewCap_({ persist: false });
+                            const todayKey = getLocalDayKey_();
+                            const currentDaily = Number(getSettingSafe_('DailyNewCount', 0, true) || 0);
+                            const nextDaily = (Number.isFinite(currentDaily) ? currentDaily : 0) + 1;
+                            const allowGrow = !!payload?._isMock;
+
+                            const okDay1 = setMatrixValueFixed_(settings, 'DailyNewDayKey', todayKey, { allowGrow });
+                            const okCnt1 = setMatrixValueFixed_(settings, 'DailyNewCount', nextDaily, { allowGrow });
+                            if (Array.isArray(payload.settings)) {
+                                setMatrixValueFixed_(payload.settings, 'DailyNewDayKey', todayKey, { allowGrow });
+                                setMatrixValueFixed_(payload.settings, 'DailyNewCount', nextDaily, { allowGrow });
+                            }
+
+                            if (!payload?._isMock) {
+                                if (okDay1 && okCnt1) {
+                                    const deckOnly = stripGlobalSettingsFromArray(settings || []);
+                                    SaveQueue.add('deckSettings', { saveType: 'deckSettings', data: deckOnly });
+                                } else {
+                                    showToast('Daily cap cannot persist: add 2 empty deck settings rows', 'error');
+                                }
+                            }
+                        } catch (e) {
+                            log_('[DailyCap] Failed to increment DailyNewCount:', e);
+                        }
                     }
                 }
             }
