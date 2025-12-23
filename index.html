@@ -1406,6 +1406,27 @@
             if (Array.isArray(result.userSettings)) summary.userSettings = `settings[${result.userSettings.length}]`;
             if (Array.isArray(result.userProgress)) summary.userProgress = `progress[${result.userProgress.length}]`;
             if (Array.isArray(result.availableSets)) summary.availableSets = `availableSets[${result.availableSets.length}]`;
+
+            // Global user settings (from Users sheet) are returned as:
+            // - userData: { email, ThemeLight, AudioAutoPlay, PlaybackSpeed }
+            // - userPreferences: a 2-col matrix including header + UserID + the global keys
+            try {
+                if (result.userData && typeof result.userData === 'object') {
+                    summary.userData = {
+                        email: result.userData.email,
+                        ThemeLight: result.userData.ThemeLight,
+                        AudioAutoPlay: result.userData.AudioAutoPlay,
+                        PlaybackSpeed: result.userData.PlaybackSpeed
+                    };
+                }
+                if (Array.isArray(result.userPreferences)) {
+                    summary.userPreferences = `userPreferences[${result.userPreferences.length}]`;
+                    // Small preview for debugging (avoid huge logs)
+                    summary.userPreferencesPreview = result.userPreferences.slice(0, 6);
+                }
+            } catch (e) {
+                // ignore
+            }
             return summary;
         }
 
