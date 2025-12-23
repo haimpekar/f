@@ -4023,7 +4023,26 @@
         function stripGlobalSettingsFromArray(arr) {
             if (!Array.isArray(arr)) return [];
             try {
-                return arr.filter(r => !(Array.isArray(r) && GLOBAL_SETTING_NAMES.includes(String(r[0]))));
+                const out = [];
+                let prevWasGlobalHeader = false;
+                for (const r of arr) {
+                    if (!Array.isArray(r) || !r.length) { prevWasGlobalHeader = false; continue; }
+                    const k = String(r[0] ?? '').trim();
+                    const v = String(r[1] ?? '').trim();
+
+                    // Remove global settings keys
+                    if (GLOBAL_SETTING_NAMES.includes(k)) { prevWasGlobalHeader = false; continue; }
+
+                    // Remove the global preferences header row and its following UserID row.
+                    // These rows are part of userPreferences (not deck settings) and were being re-appended,
+                    // causing duplication like: ['Setting','Value'], ['UserID',email], ['Setting','Value'], ...
+                    if (k === 'Setting' && v === 'Value') { prevWasGlobalHeader = true; continue; }
+                    if (prevWasGlobalHeader && k === 'UserID') { prevWasGlobalHeader = false; continue; }
+                    prevWasGlobalHeader = false;
+
+                    out.push(r);
+                }
+                return out;
             } catch (e) { return arr; }
         }
 
@@ -5139,7 +5158,7 @@
 
                     SaveQueue.add('deckSettings', {
                         saveType: 'deckSettings',
-                        data: settings
+                        data: stripGlobalSettingsFromArray(settings)
                     });
                 }
             } catch (e) { log_('Failed to process settings save', e); }
