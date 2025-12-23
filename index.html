@@ -2016,6 +2016,8 @@
         const DISTRACTOR_KEYS = ['distractor1', 'distractor2', 'distractor3'];
 
         // Async save queue
+        // Unified save payload (single-shot):
+        // { userId, password, activeSet, deckSettings?, userProgress?, userSettings? }
         const SaveQueue = {
             queue: [],
             processing: false,
@@ -2042,16 +2044,37 @@
                     return;
                 }
 
-                // Deduplicate: remove older saves of same type
                 const typeKey = saveType;
-                if (saveType === 'progress' || saveType === 'deckSettings' || saveType === 'userPreferences') {
-                    const before = this.queue.length;
-                    this.queue = this.queue.filter(item => item.typeKey !== typeKey);
-                    const removed = before - this.queue.length;
-                    if (removed > 0) log_(`[SaveQueue] dedup removed=${removed} type=${typeKey}`);
+                const silent = !!(options && options.silent);
+
+                // Special: merge multiple pending saves into a single checkpoint item.
+                // This is how we guarantee consistency when both progress and settings change.
+                if (typeKey === 'checkpoint') {
+                    const existingIdx = this.queue.findIndex(it => it && it.typeKey === 'checkpoint');
+                    if (existingIdx >= 0) {
+                        const existing = this.queue[existingIdx];
+                        existing.data = (existing.data && typeof existing.data === 'object') ? existing.data : {};
+                        const incoming = (data && typeof data === 'object') ? data : {};
+
+                        if (incoming.deckSettings !== undefined) existing.data.deckSettings = incoming.deckSettings;
+                        if (incoming.userProgress !== undefined) existing.data.userProgress = incoming.userProgress;
+                        if (incoming.userSettings !== undefined) existing.data.userSettings = incoming.userSettings;
+
+                        // Keep backward-compatible aux sections in case older call sites still send them.
+                        if (incoming.feedbackData !== undefined) existing.data.feedbackData = incoming.feedbackData;
+                        if (incoming.testData !== undefined) existing.data.testData = incoming.testData;
+
+                        existing.timestamp = Date.now();
+                        existing.credentials = credentials;
+                        existing.silent = existing.silent && silent;
+
+                        localStorage.setItem('saveQueue', JSON.stringify(this.queue));
+                        log_(`[SaveQueue] merged type=checkpoint qlen=${this.queue.length}`);
+                        this.process();
+                        return;
+                    }
                 }
 
-                const silent = !!(options && options.silent);
                 const item = { saveType, typeKey, data, credentials, attempts: 0, timestamp: Date.now(), silent };
                 this.queue.push(item);
                 localStorage.setItem('saveQueue', JSON.stringify(this.queue));
@@ -2253,8 +2276,14 @@
                 try {
                     const result = await response.json();
                     log_(`[FRONT←BACK] saveSession response`, summarizeResult(result));
-                    const answered = payload?.data ? `answered=${_lastSavedAnswerCount}` : '';
-                    log_(`[FRONT→BACK] saveSession(${payload.saveType}) ${answered} ${(size / 1024).toFixed(1)}KB ${Math.round(performance.now() - t0)}ms`);
+                    const tagParts = [];
+                    if (payload && payload.deckSettings) tagParts.push('deckSettings');
+                    if (payload && payload.userProgress) tagParts.push('userProgress');
+                    if (payload && payload.userSettings) tagParts.push('userSettings');
+                    if (payload && payload.feedbackData) tagParts.push('feedback');
+                    if (payload && payload.testData) tagParts.push('testResult');
+                    const tag = tagParts.length ? tagParts.join('+') : (payload && payload.saveType ? String(payload.saveType) : 'unknown');
+                    log_(`[FRONT→BACK] saveSession(${tag}) ${(size / 1024).toFixed(1)}KB ${Math.round(performance.now() - t0)}ms`);
                     if (result && Array.isArray(result.debugLog) && result.debugLog.length) logBackendDebug(result.debugLog, 'saveSession');
                     return result;
                 } catch (err) {
@@ -2485,12 +2514,14 @@
                 let didProgress = false;
                 let didDailyCap = false;
 
+                const checkpoint = {};
+
                 if (forceProgress || progressDirty) {
                     // Avoid re-sending the same snapshot if nothing changed since last save.
                     if (answered > _lastSavedAnswerCount) {
                         const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
                         const userProgress = payload.items.map(row => row.slice(cardWidth));
-                        SaveQueue.add('progress', { saveType: 'progress', data: userProgress });
+                        checkpoint.userProgress = userProgress;
                         _lastSavedAnswerCount = answered;
                         didProgress = true;
                     }
@@ -2499,9 +2530,14 @@
 
                 if (dailyCapDirty) {
                     const deckOnly = stripGlobalSettingsFromArray(settings || []);
-                    SaveQueue.add('deckSettings', { saveType: 'deckSettings', data: deckOnly }, { silent: true });
+                    checkpoint.deckSettings = deckOnly;
                     payload.state._dailyCapDirty = false;
                     didDailyCap = true;
+                }
+
+                if (Object.keys(checkpoint).length > 0) {
+                    const silent = !!(checkpoint.deckSettings && !checkpoint.userProgress);
+                    SaveQueue.add('checkpoint', checkpoint, { silent });
                 }
 
                 return { progress: didProgress, dailyCap: didDailyCap };
@@ -2939,7 +2975,7 @@
             if (persist && changed && !payload?._isMock) {
                 try {
                     const deckOnly = stripGlobalSettingsFromArray(settings || []);
-                    SaveQueue.add('deckSettings', { saveType: 'deckSettings', data: deckOnly }, { silent: true });
+                    SaveQueue.add('checkpoint', { deckSettings: deckOnly }, { silent: true });
                 } catch (e) {
                     log_('[DailyCap] persist failed:', e);
                 }
@@ -3520,7 +3556,6 @@
             const testSessionId = testState.sessionId;
 
             SaveQueue.add('testResult', {
-                saveType: 'testResult',
                 testData: {
                     testDateTime,
                     setName: testState.activeSet,
@@ -3540,8 +3575,7 @@
                     userId: currentCredentials.email,
                     password: currentCredentials.password,
                     activeSet: payload.activeSet,
-                    saveType: 'progress',
-                    data: userProgress
+                    userProgress
                 }).catch(e => log_('Progress save failed:', e));
             }
             testState = null;
@@ -3585,8 +3619,8 @@
             service.saveSession({
                 userId: currentCredentials.email,
                 password: currentCredentials.password,
-                saveType: 'progress',
-                data: userProgress
+                activeSet: payload.activeSet,
+                userProgress
             }).catch(e => log_('Background progress save failed:', e));
 
             testState = null;
@@ -3701,8 +3735,7 @@
                             userId: currentCredentials.email,
                             password: currentCredentials.password,
                             activeSet: payload.activeSet,
-                            saveType: 'progress',
-                            data: userProgress
+                            userProgress
                         }));
                     }
                     if (saves.length) await Promise.allSettled(saves);
@@ -5083,10 +5116,7 @@
             // Async save
             const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
             const userProgress = payload.items.map(row => row.slice(cardWidth));
-            SaveQueue.add('progress', {
-                saveType: 'progress',
-                data: userProgress
-            });
+            SaveQueue.add('checkpoint', { userProgress });
         }
 
         function queueMoreNewItems(batchSize = 5) {
@@ -5145,11 +5175,8 @@
                     const deckOnly = stripGlobalSettingsFromArray(settings || []);
                     settings = [...deckOnly, ...userPreferences.map(r => Array.isArray(r) ? r.slice() : [])];
 
-                    // Save to server as userPreferences payload so backend writes to Users sheet
-                    SaveQueue.add('userPreferences', {
-                        saveType: 'userPreferences',
-                        data: draftCopy
-                    });
+                    // Save to server as unified userSettings so backend writes to Users sheet
+                    SaveQueue.add('checkpoint', { userSettings: draftCopy });
                 } else {
                     // Deck-level settings
                     settings = draftCopy.map(r => Array.isArray(r) ? r.slice() : []);
@@ -5167,10 +5194,7 @@
                         try { ensureGlobalDefaults(currentCredentials); localStorage.setItem('userData', JSON.stringify(currentCredentials)); } catch (e) { log_('Failed to persist credentials after settings save', e); }
                     } catch (e) { /* ignore */ }
 
-                    SaveQueue.add('deckSettings', {
-                        saveType: 'deckSettings',
-                        data: stripGlobalSettingsFromArray(settings)
-                    });
+                    SaveQueue.add('checkpoint', { deckSettings: stripGlobalSettingsFromArray(settings) });
                 }
             } catch (e) { log_('Failed to process settings save', e); }
 
@@ -5612,7 +5636,6 @@
 
                     // Async save
                     SaveQueue.add('feedback', {
-                        saveType: 'feedback',
                         feedbackData: {
                             userId,
                             currentSet,
@@ -5653,10 +5676,7 @@
                     // Async save
                     const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
                     const userProgress = payload.items.map(row => row.slice(cardWidth));
-                    SaveQueue.add('progress', {
-                        saveType: 'progress',
-                        data: userProgress
-                    });
+                    SaveQueue.add('checkpoint', { userProgress });
                 });
             }
 
