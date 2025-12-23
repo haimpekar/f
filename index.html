@@ -4931,6 +4931,43 @@
             // - DailyNewCount: persisted daily cap counter (deck setting; survives reloads)
             if (wasNewBeforeAnswer) {
                 payload.state.servedNewToday = Number(payload.state.servedNewToday || 0) + 1;
+
+                // Persisted daily cap: count a "new" card when it is first attempted,
+                // regardless of correctness. Otherwise, getting new cards wrong would not
+                // consume the daily new quota and users could be served more new cards than intended.
+                try {
+                    const idxAttempt = Number(payload.state.currentIndex);
+                    payload.state.countedNewByIndex = (payload.state.countedNewByIndex && typeof payload.state.countedNewByIndex === 'object')
+                        ? payload.state.countedNewByIndex
+                        : {};
+                    if (Number.isFinite(idxAttempt) && !payload.state.countedNewByIndex[idxAttempt]) {
+                        payload.state.countedNewByIndex[idxAttempt] = true;
+
+                        normalizeDailyNewCap_({ persist: false });
+                        const todayKey = getLocalDayKey_();
+                        const currentDaily = Number(getSettingSafe_('DailyNewCount', 0, true) || 0);
+                        const nextDaily = (Number.isFinite(currentDaily) ? currentDaily : 0) + 1;
+                        const allowGrow = !!payload?._isMock;
+
+                        const okDay1 = setMatrixValueFixed_(settings, 'DailyNewDayKey', todayKey, { allowGrow });
+                        const okCnt1 = setMatrixValueFixed_(settings, 'DailyNewCount', nextDaily, { allowGrow });
+                        if (Array.isArray(payload.settings)) {
+                            setMatrixValueFixed_(payload.settings, 'DailyNewDayKey', todayKey, { allowGrow });
+                            setMatrixValueFixed_(payload.settings, 'DailyNewCount', nextDaily, { allowGrow });
+                        }
+
+                        if (!payload?._isMock) {
+                            if (okDay1 && okCnt1) {
+                                markDailyCapDirty_();
+                            } else {
+                                showToast('Daily cap cannot persist: add 2 empty deck settings rows', 'error');
+                            }
+                        }
+                    }
+                } catch (e) {
+                    log_('[DailyCap] Failed to increment DailyNewCount:', e);
+                }
+
                 if (isCorrect) {
                     const idx = Number(payload.state.currentIndex);
                     payload.state.learnedNewByIndex = (payload.state.learnedNewByIndex && typeof payload.state.learnedNewByIndex === 'object')
@@ -4939,32 +4976,6 @@
                     if (Number.isFinite(idx) && !payload.state.learnedNewByIndex[idx]) {
                         payload.state.learnedNewByIndex[idx] = true;
                         payload.state.learnedNewCount = Number(payload.state.learnedNewCount || 0) + 1;
-
-                        // Persisted daily cap: increment DailyNewCount for today's day-key.
-                        try {
-                            normalizeDailyNewCap_({ persist: false });
-                            const todayKey = getLocalDayKey_();
-                            const currentDaily = Number(getSettingSafe_('DailyNewCount', 0, true) || 0);
-                            const nextDaily = (Number.isFinite(currentDaily) ? currentDaily : 0) + 1;
-                            const allowGrow = !!payload?._isMock;
-
-                            const okDay1 = setMatrixValueFixed_(settings, 'DailyNewDayKey', todayKey, { allowGrow });
-                            const okCnt1 = setMatrixValueFixed_(settings, 'DailyNewCount', nextDaily, { allowGrow });
-                            if (Array.isArray(payload.settings)) {
-                                setMatrixValueFixed_(payload.settings, 'DailyNewDayKey', todayKey, { allowGrow });
-                                setMatrixValueFixed_(payload.settings, 'DailyNewCount', nextDaily, { allowGrow });
-                            }
-
-                            if (!payload?._isMock) {
-                                if (okDay1 && okCnt1) {
-                                    markDailyCapDirty_();
-                                } else {
-                                    showToast('Daily cap cannot persist: add 2 empty deck settings rows', 'error');
-                                }
-                            }
-                        } catch (e) {
-                            log_('[DailyCap] Failed to increment DailyNewCount:', e);
-                        }
                     }
                 }
             }
