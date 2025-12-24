@@ -1408,21 +1408,10 @@
             if (Array.isArray(result.availableSets)) summary.availableSets = `availableSets[${result.availableSets.length}]`;
 
             // Global user settings (from Users sheet) are returned as:
-            // - userData: { email, ThemeLight, AudioAutoPlay, PlaybackSpeed }
             // - userPreferences: a 2-col matrix including header + UserID + the global keys
             try {
-                if (result.userData && typeof result.userData === 'object') {
-                    summary.userData = {
-                        email: result.userData.email,
-                        ThemeLight: result.userData.ThemeLight,
-                        AudioAutoPlay: result.userData.AudioAutoPlay,
-                        PlaybackSpeed: result.userData.PlaybackSpeed
-                    };
-                }
                 if (Array.isArray(result.userPreferences)) {
                     summary.userPreferences = `userPreferences[${result.userPreferences.length}]`;
-                    // Small preview for debugging (avoid huge logs)
-                    summary.userPreferencesPreview = result.userPreferences.slice(0, 6);
                 }
             } catch (e) {
                 // ignore
@@ -1762,13 +1751,110 @@
         // - Else if stored `currentCredentials.email` matches the mock user, use mock
         // - Otherwise the call uses the deployed server implementation
         // This removes any file:// or forceServer heuristics; mode is decided per-call by credentials.
-        // user credentials stored under 'userData' includes metadata merged in: activeSet, availableSets, adminEmail
-        // userData schema: { email, password (not returned from server), ThemeLight, AudioAutoPlay, PlaybackSpeed, activeSet, availableSets }
+        // Credentials are stored under 'credentials'; global user preferences are stored separately as a matrix.
+        const CREDENTIALS_STORAGE_KEY = 'credentials';
+        const LEGACY_CREDENTIALS_KEYS = ['userData', 'userCredentials'];
+        const EARLY_DEFAULT_GLOBAL_SETTINGS = { ThemeLight: true, AudioAutoPlay: true, PlaybackSpeed: 1.5 };
+
+        function getUserPreferencesStorageKey_(email) {
+            const e = (email || (currentCredentials && currentCredentials.email) || '');
+            const norm = String(e).trim().toLowerCase();
+            return norm ? `userPreferences_${norm}` : 'userPreferences';
+        }
+
+        function ensureUserPreferencesDefaults_(prefs, email) {
+            const out = Array.isArray(prefs) ? prefs : [];
+            const userId = (email || (currentCredentials && currentCredentials.email) || '');
+
+            // Ensure header + UserID rows exist (matching Users sheet structure)
+            if (!out.find(r => Array.isArray(r) && String(r[0]) === 'Setting' && String(r[1]) === 'Value')) {
+                out.unshift(['Setting', 'Value']);
+            }
+            if (userId && !out.find(r => Array.isArray(r) && String(r[0]) === 'UserID')) {
+                const headerIdx = out.findIndex(r => Array.isArray(r) && String(r[0]) === 'Setting' && String(r[1]) === 'Value');
+                out.splice(headerIdx >= 0 ? headerIdx + 1 : 1, 0, ['UserID', userId]);
+            }
+
+            // Ensure required keys exist
+            const themeRow = out.find(r => Array.isArray(r) && String(r[0]) === 'ThemeLight');
+            const autoRow = out.find(r => Array.isArray(r) && String(r[0]) === 'AudioAutoPlay');
+            const speedRow = out.find(r => Array.isArray(r) && String(r[0]) === 'PlaybackSpeed');
+            setMatrixValue_(out, 'ThemeLight', (themeRow && themeRow[1] !== undefined) ? themeRow[1] : EARLY_DEFAULT_GLOBAL_SETTINGS.ThemeLight);
+            setMatrixValue_(out, 'AudioAutoPlay', (autoRow && autoRow[1] !== undefined) ? autoRow[1] : EARLY_DEFAULT_GLOBAL_SETTINGS.AudioAutoPlay);
+            setMatrixValue_(out, 'PlaybackSpeed', (speedRow && speedRow[1] !== undefined && speedRow[1] !== null) ? speedRow[1] : EARLY_DEFAULT_GLOBAL_SETTINGS.PlaybackSpeed);
+            return out;
+        }
+
+        function applyUserPreferencesToCredentials_(prefs, creds) {
+            try {
+                if (!creds || typeof creds !== 'object') return;
+                if (!Array.isArray(prefs)) return;
+                const themeRow = prefs.find(r => Array.isArray(r) && String(r[0]) === 'ThemeLight');
+                const autoRow = prefs.find(r => Array.isArray(r) && String(r[0]) === 'AudioAutoPlay');
+                const speedRow = prefs.find(r => Array.isArray(r) && String(r[0]) === 'PlaybackSpeed');
+                if (themeRow && themeRow[1] !== undefined) creds.ThemeLight = themeRow[1];
+                if (autoRow && autoRow[1] !== undefined) creds.AudioAutoPlay = autoRow[1];
+                if (speedRow && speedRow[1] !== undefined) creds.PlaybackSpeed = speedRow[1];
+            } catch (e) { /* ignore */ }
+        }
+
+        function saveUserPreferences(prefs) {
+            try {
+                const email = currentCredentials && currentCredentials.email ? currentCredentials.email : '';
+                const next = ensureUserPreferencesDefaults_(cloneSettingsMatrix_(prefs), email);
+                userPreferences = next.map(r => Array.isArray(r) ? r.slice() : []);
+                if (currentCredentials) applyUserPreferencesToCredentials_(userPreferences, currentCredentials);
+                localStorage.setItem(getUserPreferencesStorageKey_(email), JSON.stringify(userPreferences));
+            } catch (e) {
+                log_('Failed to persist userPreferences:', e);
+            }
+        }
+
+        function loadUserPreferences(emailOverride = null) {
+            try {
+                const email = (emailOverride !== null && emailOverride !== undefined)
+                    ? String(emailOverride)
+                    : (currentCredentials && currentCredentials.email ? currentCredentials.email : '');
+                const stored = localStorage.getItem(getUserPreferencesStorageKey_(email));
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    userPreferences = ensureUserPreferencesDefaults_(parsed, email);
+                    if (currentCredentials) applyUserPreferencesToCredentials_(userPreferences, currentCredentials);
+                    return userPreferences;
+                }
+
+                // Migration: legacy credentials stored global settings inside them
+                for (const k of LEGACY_CREDENTIALS_KEYS) {
+                    const legacy = localStorage.getItem(k);
+                    if (!legacy) continue;
+                    try {
+                        const obj = JSON.parse(legacy);
+                        if (!obj || typeof obj !== 'object') continue;
+                        if (obj.ThemeLight === undefined && obj.AudioAutoPlay === undefined && obj.PlaybackSpeed === undefined) continue;
+                        const matrix = [
+                            ['Setting', 'Value'],
+                            ['UserID', email || obj.email || ''],
+                            ['ThemeLight', (obj.ThemeLight !== undefined ? obj.ThemeLight : EARLY_DEFAULT_GLOBAL_SETTINGS.ThemeLight)],
+                            ['AudioAutoPlay', (obj.AudioAutoPlay !== undefined ? obj.AudioAutoPlay : EARLY_DEFAULT_GLOBAL_SETTINGS.AudioAutoPlay)],
+                            ['PlaybackSpeed', (obj.PlaybackSpeed !== undefined ? obj.PlaybackSpeed : EARLY_DEFAULT_GLOBAL_SETTINGS.PlaybackSpeed)]
+                        ];
+                        saveUserPreferences(matrix);
+                        return userPreferences;
+                    } catch (e) { /* ignore */ }
+                }
+            } catch (e) {
+                log_('Failed to load userPreferences:', e);
+            }
+            userPreferences = ensureUserPreferencesDefaults_([], (currentCredentials && currentCredentials.email) ? currentCredentials.email : '');
+            if (currentCredentials) applyUserPreferencesToCredentials_(userPreferences, currentCredentials);
+            return userPreferences;
+        }
+
         let currentCredentials = null; // { email, password }
         let currentUserMetadata = null; // { activeSet, availableSets, adminEmail } (in-memory contains _ownerEmail for validation)
         try {
             loadCredentials();
-            // Migrate legacy metadata (if any) into the single `userData` key
+            // Migrate legacy metadata (if any) into the single credentials store
             (function migrateLegacyUserMetadata() {
                 try {
                     if (!currentCredentials || !currentCredentials.email) return;
@@ -1789,9 +1875,8 @@
                                     currentUserMetadata = currentUserMetadata || { activeSet: '', availableSets: [], adminEmail: 'administrator' };
                                     currentUserMetadata.adminEmail = parsed.adminEmail;
                                 }
-                                // Persist using new key 'userData' (ensure defaults)
-                                ensureGlobalDefaults(currentCredentials);
-                                localStorage.setItem('userData', JSON.stringify(currentCredentials));
+                                // Persist using new key 'credentials'
+                                localStorage.setItem(CREDENTIALS_STORAGE_KEY, JSON.stringify(currentCredentials));
                                 migrated = true;
                             }
                         } catch (e) {/* ignore parse errors */ }
@@ -1802,6 +1887,7 @@
                     }
                 } catch (e) { /* swallow */ }
             })();
+            loadUserPreferences();
             loadUserMetadata();
         } catch (e) {
             console.warn('[INIT] loadCredentials() failed during credential-only init', e);
@@ -1821,24 +1907,15 @@
         // Authentication helpers
         function saveCredentials(email, password, activeSet = null) {
             const creds = { email, password, activeSet };
-            // Preserve known global settings if set in memory
-            try {
-                if (currentCredentials) {
-                    if (currentCredentials.ThemeLight !== undefined) creds.ThemeLight = currentCredentials.ThemeLight;
-                    if (currentCredentials.AudioAutoPlay !== undefined) creds.AudioAutoPlay = currentCredentials.AudioAutoPlay;
-                    if (currentCredentials.PlaybackSpeed !== undefined) creds.PlaybackSpeed = currentCredentials.PlaybackSpeed;
-                }
-            } catch (e) { /* ignore */ }
             // Merge known metadata into credentials if present
             if (currentUserMetadata) {
                 if (currentUserMetadata.activeSet) creds.activeSet = currentUserMetadata.activeSet;
                 if (Array.isArray(currentUserMetadata.availableSets)) creds.availableSets = currentUserMetadata.availableSets.slice();
-                // adminEmail intentionally not persisted into userData (server is authoritative)
+                // adminEmail intentionally not persisted into credentials (server is authoritative)
             }
-            // Ensure default global settings exist in the saved userData
-            ensureGlobalDefaults(creds);
-            localStorage.setItem('userData', JSON.stringify(creds));
+            localStorage.setItem(CREDENTIALS_STORAGE_KEY, JSON.stringify(creds));
             currentCredentials = creds;
+            loadUserPreferences(email);
             if (activeSet) {
                 saveUserMetadata({ activeSet });
             }
@@ -1846,15 +1923,14 @@
 
         function loadCredentials() {
             try {
-                // Support migration from old key 'userCredentials' (moved to 'userData')
-                let stored = localStorage.getItem('userData');
+                // Support migration from old keys 'userData'/'userCredentials' to 'credentials'
+                let stored = localStorage.getItem(CREDENTIALS_STORAGE_KEY);
+                if (!stored) stored = localStorage.getItem('userData');
                 if (!stored) stored = localStorage.getItem('userCredentials');
                 if (stored) {
                     currentCredentials = JSON.parse(stored);
-                    // Ensure default global settings
-                    ensureGlobalDefaults(currentCredentials);
-                    // If old key found, ensure it's saved under new key and defaults persisted
-                    try { localStorage.setItem('userData', JSON.stringify(currentCredentials)); } catch (ignore) { }
+                    // If old key found, ensure it's saved under new key
+                    try { localStorage.setItem(CREDENTIALS_STORAGE_KEY, JSON.stringify(currentCredentials)); } catch (ignore) { }
                     return currentCredentials;
                 }
             } catch (e) {
@@ -1864,14 +1940,17 @@
         }
 
         function clearCredentials() {
-            localStorage.removeItem('userData');
-            // Also remove old key just in case
+            const email = currentCredentials && currentCredentials.email ? currentCredentials.email : '';
+            try { localStorage.removeItem(CREDENTIALS_STORAGE_KEY); } catch (e) { /* ignore */ }
+            try { localStorage.removeItem(getUserPreferencesStorageKey_(email)); } catch (e) { /* ignore */ }
+            // Also remove old keys just in case
+            try { localStorage.removeItem('userData'); } catch (e) { /* ignore */ }
             try { localStorage.removeItem('userCredentials'); } catch (e) { /* ignore */ }
             currentCredentials = null;
             clearUserMetadataStorage();
         }
 
-        // Note: user metadata is merged into `userData` object in localStorage
+        // Note: user metadata is merged into credentials in localStorage
 
         function loadUserMetadata() {
             if (!currentCredentials || !currentCredentials.email) {
@@ -1904,20 +1983,11 @@
                     : existing.availableSets
                 // adminEmail intentionally not persisted into localStorage
             };
-            // Mirror global settings into the credentials if present
-            if (partial && partial.ThemeLight !== undefined) next.ThemeLight = partial.ThemeLight;
-            if (partial && partial.AudioAutoPlay !== undefined) next.AudioAutoPlay = partial.AudioAutoPlay;
-            if (partial && partial.PlaybackSpeed !== undefined) next.PlaybackSpeed = partial.PlaybackSpeed;
             // Save back into currentCredentials for single-key storage
             try {
                 currentCredentials.activeSet = next.activeSet;
                 currentCredentials.availableSets = Array.isArray(next.availableSets) ? next.availableSets.slice() : [];
-                if (next.ThemeLight !== undefined) currentCredentials.ThemeLight = next.ThemeLight;
-                if (next.AudioAutoPlay !== undefined) currentCredentials.AudioAutoPlay = next.AudioAutoPlay;
-                if (next.PlaybackSpeed !== undefined) currentCredentials.PlaybackSpeed = next.PlaybackSpeed;
-                // persist updated credentials object under 'userData' and ensure defaults
-                ensureGlobalDefaults(currentCredentials);
-                localStorage.setItem('userData', JSON.stringify(currentCredentials));
+                localStorage.setItem(CREDENTIALS_STORAGE_KEY, JSON.stringify(currentCredentials));
                 // update in-memory metadata only (do not persist adminEmail)
                 currentUserMetadata = { activeSet: next.activeSet, availableSets: next.availableSets || [], adminEmail: existing.adminEmail };
             } catch (e) {
@@ -1926,15 +1996,12 @@
         }
 
         function clearUserMetadataStorage() {
-            // Remove metadata fields from the credentials stored under 'userData'
+            // Remove metadata fields from the credentials stored under 'credentials'
             try {
                 if (currentCredentials) {
                     delete currentCredentials.activeSet;
                     delete currentCredentials.availableSets;
-                    delete currentCredentials.ThemeLight;
-                    delete currentCredentials.AudioAutoPlay;
-                    delete currentCredentials.PlaybackSpeed;
-                    localStorage.setItem('userData', JSON.stringify(currentCredentials));
+                    localStorage.setItem(CREDENTIALS_STORAGE_KEY, JSON.stringify(currentCredentials));
                 }
             } catch (e) { /* ignore */ }
             currentUserMetadata = null;
@@ -2376,52 +2443,33 @@
             },
             async saveSession(payload) {
                 this._lastSaved = payload;
-                if (payload?.saveType === 'deckSettings' || payload?.saveType === 'userPreferences' || payload?.saveType === 'settings') {
-                    // Prefer new separated fields; fall back to legacy data array
-                    let deckSettings = [];
-                    let globalSettings = [];
+                // Unified payload support (preferred)
+                const deckSettings = Array.isArray(payload?.deckSettings)
+                    ? payload.deckSettings
+                    : (payload?.saveType === 'deckSettings' && Array.isArray(payload?.data) ? payload.data : []);
+                const globalSettings = Array.isArray(payload?.userSettings)
+                    ? payload.userSettings
+                    : (Array.isArray(payload?.userPreferences)
+                        ? payload.userPreferences
+                        : (payload?.saveType === 'userPreferences' && Array.isArray(payload?.data) ? payload.data : []));
 
-                    if (payload?.saveType === 'deckSettings') {
-                        deckSettings = Array.isArray(payload.data) ? payload.data : (Array.isArray(payload.deckSettings) ? payload.deckSettings : []);
-                    } else if (payload?.saveType === 'userPreferences') {
-                        globalSettings = Array.isArray(payload.data) ? payload.data : (Array.isArray(payload.userPreferences) ? payload.userPreferences : []);
-                    } else {
-                        deckSettings = Array.isArray(payload.deckSettings) ? payload.deckSettings : [];
-                        globalSettings = Array.isArray(payload.userPreferences) ? payload.userPreferences : [];
-                    }
+                if (deckSettings.length) {
+                    deckSettings.forEach(r => {
+                        if (!Array.isArray(r) || r.length < 2) return;
+                        const name = String(r[0]);
+                        const idx = MOCK_DECK_USER_SETTINGS.findIndex(x => Array.isArray(x) && x[0] === name);
+                        if (idx >= 0) MOCK_DECK_USER_SETTINGS[idx][1] = r[1];
+                    });
+                }
 
-                    if ((!deckSettings.length && !globalSettings.length) && Array.isArray(payload.data)) {
-                        payload.data.forEach(row => {
-                            if (!Array.isArray(row) || row.length < 2) return;
-                            const name = String(row[0]);
-                            if (name === 'Setting' || name === 'UserID' || name === 'Password') return; // skip header/user rows
-                            if (name === 'ThemeLight' || name === 'AudioAutoPlay' || name === 'PlaybackSpeed') {
-                                globalSettings.push(row);
-                            } else {
-                                deckSettings.push(row);
-                            }
-                        });
-                    }
-
-                    // Update mock storage so subsequent mock getSession reflects the changes
-                    if (deckSettings.length) {
-                        deckSettings.forEach(r => {
-                            const name = String(r[0]);
-                            const idx = MOCK_DECK_USER_SETTINGS.findIndex(x => Array.isArray(x) && x[0] === name);
-                            if (idx >= 0) {
-                                MOCK_DECK_USER_SETTINGS[idx][1] = r[1];
-                            }
-                        });
-                    }
-                    if (globalSettings.length) {
-                        globalSettings.forEach(r => {
-                            const name = String(r[0]);
-                            const idx = MOCK_USER_PREFERENCES.findIndex(x => Array.isArray(x) && x[0] === name);
-                            if (idx >= 0) {
-                                MOCK_USER_PREFERENCES[idx][1] = r[1];
-                            }
-                        });
-                    }
+                if (globalSettings.length) {
+                    globalSettings.forEach(r => {
+                        if (!Array.isArray(r) || r.length < 2) return;
+                        const name = String(r[0]);
+                        if (name === 'Setting' || name === 'UserID' || name === 'Password') return;
+                        const idx = MOCK_USER_PREFERENCES.findIndex(x => Array.isArray(x) && x[0] === name);
+                        if (idx >= 0) MOCK_USER_PREFERENCES[idx][1] = r[1];
+                    });
                 }
                 return { success: true };
             },
@@ -3667,22 +3715,15 @@
                 throw new Error(sess.error || 'Failed to load session');
             }
 
-            // Merge server-provided credentials (includes global settings) into local saved credentials
+            // Persist server-provided global preferences matrix (single source of truth)
             try {
-                if (sess && sess.userData) {
-                    const remoteCreds = sess.userData || {};
-                    currentCredentials = currentCredentials || { email: sess.userId, password: currentCredentials?.password || '' };
-                    // copy known keys (ThemeLight, AudioAutoPlay, PlaybackSpeed, activeSet, availableSets)
-                    if (remoteCreds.ThemeLight !== undefined) currentCredentials.ThemeLight = remoteCreds.ThemeLight;
-                    if (remoteCreds.AudioAutoPlay !== undefined) currentCredentials.AudioAutoPlay = remoteCreds.AudioAutoPlay;
-                    if (remoteCreds.PlaybackSpeed !== undefined) currentCredentials.PlaybackSpeed = remoteCreds.PlaybackSpeed;
-                    // Ensure we have defaults for any missing global keys
-                    ensureGlobalDefaults(currentCredentials);
-                    // persist merged credentials
-                    try { localStorage.setItem('userData', JSON.stringify(currentCredentials)); } catch (e) { log_('Failed to persist merged userData', e); }
+                if (sess && Array.isArray(sess.userPreferences) && sess.userPreferences.length) {
+                    saveUserPreferences(sess.userPreferences);
+                } else {
+                    loadUserPreferences();
                 }
             } catch (e) {
-                log_('Failed to merge server credentials into local credentials:', e);
+                log_('Failed to persist server userPreferences:', e);
             }
             return sess;
         }
@@ -3876,15 +3917,12 @@
             });
             log_('[buildPayload] Built ' + items.length + ' items');
 
-            const mergedUserPrefs = (Array.isArray(sess.userPreferences) && sess.userPreferences.length)
-                ? sess.userPreferences
-                : (sess.userData
-                    ? [
-                        ['ThemeLight', (sess.userData.ThemeLight !== undefined ? sess.userData.ThemeLight : true)],
-                        ['AudioAutoPlay', (sess.userData.AudioAutoPlay !== undefined ? sess.userData.AudioAutoPlay : true)],
-                        ['PlaybackSpeed', (sess.userData.PlaybackSpeed !== undefined ? sess.userData.PlaybackSpeed : 1.5)]
-                    ]
-                    : []);
+            const mergedUserPrefs = ensureUserPreferencesDefaults_(
+                (Array.isArray(sess.userPreferences) && sess.userPreferences.length)
+                    ? sess.userPreferences.map(r => Array.isArray(r) ? r.slice() : [])
+                    : (Array.isArray(userPreferences) ? userPreferences.map(r => Array.isArray(r) ? r.slice() : []) : []),
+                sess.userId || currentCredentials?.email
+            );
 
             const combinedSettings = [
                 ...(Array.isArray(sess.userSettings) ? sess.userSettings : []),
@@ -3925,17 +3963,6 @@
                     sessionStatusText: '',
                     _armed: false
                 },
-                userData: ensureGlobalDefaults(sess.userData || (function () {
-                    const obj = { email: sess.userId };
-                    try {
-                        for (const r of mergedUserPrefs) {
-                            if (!Array.isArray(r) || !r.length) continue;
-                            const k = String(r[0] || '').trim();
-                            if (k === 'ThemeLight' || k === 'AudioAutoPlay' || k === 'PlaybackSpeed') obj[k] = r[1];
-                        }
-                    } catch (e) { /* ignore */ }
-                    return obj;
-                })()),
                 _isMock: !!isMock
             };
         }
@@ -4060,7 +4087,7 @@
 
         // Helper to remove global settings from userSettings array for storage in IndexedDB.
         const GLOBAL_SETTING_NAMES = ['ThemeLight', 'AudioAutoPlay', 'PlaybackSpeed'];
-        // Default values for per-user global settings persisted into localStorage.userData
+        // Default values for per-user global settings (persisted via userPreferences matrix)
         const DEFAULT_GLOBAL_SETTINGS = {
             ThemeLight: true,
             AudioAutoPlay: true,
@@ -4111,13 +4138,8 @@
                 // do not persist adminEmail in cached session; use server-provided value when available
                 cards: Array.isArray(deckData?.cards) ? deckData.cards : [],
                 userSettings: Array.isArray(deckData?.userSettings) ? stripGlobalSettingsFromArray(deckData.userSettings) : [],
-                // Global preferences come from localStorage.userData/currentCredentials (single source of truth)
-                userPreferences: [],
-                userData: (function () {
-                    if (deckData && deckData.userData) return ensureGlobalDefaults(deckData.userData);
-                    if (currentCredentials) return ensureGlobalDefaults({ email: currentCredentials.email, ThemeLight: currentCredentials.ThemeLight, AudioAutoPlay: currentCredentials.AudioAutoPlay, PlaybackSpeed: currentCredentials.PlaybackSpeed });
-                    return null;
-                })(),
+                // Global preferences come from localStorage userPreferences matrix
+                userPreferences: loadUserPreferences(),
                 userProgress: Array.isArray(deckData?.userProgress) ? deckData.userProgress : [],
                 setSettings: deckData?.setSettings || {},
                 studySetSchema: STUDY_SET_SCHEMA,
@@ -4165,17 +4187,8 @@
                     if (cachedDeckData) {
                         cachedSess = buildCachedSession(cachedDeckData, cacheKey);
                         log_('[boot] Found cached session in IndexedDB, using immediately');
-                        // Merge cached userData into local credentials so theme/audio can apply early
-                        try {
-                            if (cachedSess.userData) {
-                                currentCredentials = currentCredentials || {};
-                                if (cachedSess.userData.email) currentCredentials.email = cachedSess.userData.email;
-                                if (cachedSess.userData.ThemeLight !== undefined) currentCredentials.ThemeLight = cachedSess.userData.ThemeLight;
-                                if (cachedSess.userData.AudioAutoPlay !== undefined) currentCredentials.AudioAutoPlay = cachedSess.userData.AudioAutoPlay;
-                                if (cachedSess.userData.PlaybackSpeed !== undefined) currentCredentials.PlaybackSpeed = cachedSess.userData.PlaybackSpeed;
-                                try { ensureGlobalDefaults(currentCredentials); localStorage.setItem('userData', JSON.stringify(currentCredentials)); } catch (e) { log_('Failed to persist cached userData', e); }
-                            }
-                        } catch (e) { /* ignore */ }
+                        // Load cached global preferences so theme/audio can apply early
+                        try { loadUserPreferences(); } catch (e) { /* ignore */ }
                         if (sb) sb.textContent = 'Loading cached data...';
                         // Apply theme & audio state immediately using cached credentials
                         try { applyTheme(); initAudioStateFromSettings(); } catch (e) { /* ignore */ }
@@ -4265,7 +4278,7 @@
                     userSettings: Array.isArray(sess.userSettings) ? stripGlobalSettingsFromArray(sess.userSettings.map(r => Array.isArray(r) ? r.slice() : [])) : [],
                     userProgress: Array.isArray(sess.userProgress) ? sess.userProgress.map(r => Array.isArray(r) ? r.slice() : []) : [],
                     setSettings: sess.setSettings || {},
-                    // userData intentionally not persisted to IndexedDB (global user settings are volatile/local)
+                    // Global user preferences are not persisted to IndexedDB; they live in localStorage as a matrix.
                 };
                 if (freshKey) {
                     DeckCache.set(freshKey, deckDataForCache).catch(e => log_('[boot] Cache write failed:', e));
@@ -5175,20 +5188,10 @@
             // Async save with optimistic UI
             try {
                 if (settingsViewMode === 'user') {
-                    // Persist only user preferences into credentials (do not overwrite deck 'settings')
-                    if (!currentCredentials) currentCredentials = { email: currentCredentials?.email, password: currentCredentials?.password };
-                    for (const r of draftCopy) {
-                        if (!Array.isArray(r) || !r.length) continue;
-                        const name = String(r[0] || '').trim();
-                        const value = r[1];
-                        if (name === 'ThemeLight' && value !== undefined) currentCredentials.ThemeLight = value;
-                        if (name === 'AudioAutoPlay' && value !== undefined) currentCredentials.AudioAutoPlay = value;
-                        if (name === 'PlaybackSpeed' && value !== undefined) currentCredentials.PlaybackSpeed = value;
-                    }
-                    try { ensureGlobalDefaults(currentCredentials); localStorage.setItem('userData', JSON.stringify(currentCredentials)); } catch (e) { log_('Failed to persist credentials after settings save', e); }
+                    // Persist user preferences as the single source of truth
+                    saveUserPreferences(draftCopy);
 
                     // Update in-memory preferences so UI reflects latest values immediately
-                    userPreferences = draftCopy.map(r => Array.isArray(r) ? r.slice() : []);
                     if (payload) {
                         payload.userPreferences = userPreferences.map(r => Array.isArray(r) ? r.slice() : []);
                         payload.settings = [...stripGlobalSettingsFromArray(payload.settings || []), ...userPreferences];
@@ -5201,20 +5204,6 @@
                 } else {
                     // Deck-level settings
                     settings = draftCopy.map(r => Array.isArray(r) ? r.slice() : []);
-                    // Update any global keys mirrored in currentCredentials
-                    try {
-                        if (!currentCredentials) currentCredentials = { email: currentCredentials?.email, password: currentCredentials?.password };
-                        for (const r of settings) {
-                            if (!Array.isArray(r) || !r.length) continue;
-                            const name = String(r[0] || '').trim();
-                            const value = r[1];
-                            if (name === 'ThemeLight' && value !== undefined) currentCredentials.ThemeLight = value;
-                            if (name === 'AudioAutoPlay' && value !== undefined) currentCredentials.AudioAutoPlay = value;
-                            if (name === 'PlaybackSpeed' && value !== undefined) currentCredentials.PlaybackSpeed = value;
-                        }
-                        try { ensureGlobalDefaults(currentCredentials); localStorage.setItem('userData', JSON.stringify(currentCredentials)); } catch (e) { log_('Failed to persist credentials after settings save', e); }
-                    } catch (e) { /* ignore */ }
-
                     SaveQueue.add('checkpoint', { deckSettings: stripGlobalSettingsFromArray(settings) });
                 }
             } catch (e) { log_('Failed to process settings save', e); }
