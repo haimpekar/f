@@ -1109,6 +1109,46 @@
 </head>
 
 <body>
+    <script>
+        // Early theme hydration (no CSS changes): set body[data-theme] from localStorage
+        // so the initial paint matches the last saved ThemeLight before backend returns.
+        (function () {
+            try {
+                const credsRaw = localStorage.getItem('credentials');
+                let email = '';
+                let creds = null;
+                if (credsRaw) {
+                    try { creds = JSON.parse(credsRaw); } catch (e) { creds = null; }
+                    if (creds && creds.email) email = String(creds.email).trim().toLowerCase();
+                }
+
+                const prefsKey = email ? `userPreferences_${email}` : 'userPreferences';
+                const prefsRaw = localStorage.getItem(prefsKey);
+
+                let themeLight;
+                if (prefsRaw) {
+                    try {
+                        const prefs = JSON.parse(prefsRaw);
+                        if (Array.isArray(prefs)) {
+                            const row = prefs.find(r => Array.isArray(r) && String(r[0]) === 'ThemeLight');
+                            if (row && row.length > 1) themeLight = row[1];
+                        }
+                    } catch (e) { /* ignore */ }
+                }
+
+                // Back-compat: if some old/local flows cached ThemeLight on credentials.
+                if (themeLight === undefined && creds && creds.ThemeLight !== undefined) {
+                    themeLight = creds.ThemeLight;
+                }
+
+                // If unknown, default to light (current CSS default).
+                const isLight = (themeLight === true || themeLight === 'true' || themeLight === 1 || themeLight === '1');
+                document.body.dataset.theme = isLight ? 'light' : 'dark';
+            } catch (e) {
+                // ignore
+            }
+        })();
+    </script>
 
     <div id="configRow" class="row muted hidden"></div>
     <div class="statusbar" aria-live="polite">
@@ -2339,21 +2379,21 @@
                 const contentType = (response.headers.get('Content-Type') || response.headers.get('content-type') || '').toLowerCase();
                 if (!contentType.includes('application/json')) {
                     const text = await response.text();
-                    console.error('[BACK->FRONT] getSession expected JSON but received:', response.status, text);
+                    console.error('[BACK→FRONT] getSession expected JSON but received:', response.status, text);
                     throw new Error('Non-JSON response from server: ' + (String(text).slice(0, 1000)));
                 }
                 try {
                     const result = await response.json();
-                    log_(`[BACK->FRONT] getSession response`, summarizeResult(result));
+                    log_(`[BACK→FRONT] getSession response`, summarizeResult(result));
                     const size = JSON.stringify(result).length;
                     log_(`[PERF→FRONT] getSession TOTAL ${Math.round(performance.now() - t0)}ms`);
-                    log_(`[BACK->FRONT] getSession ${(size / 1024).toFixed(1)}KB ${Math.round(performance.now() - t0)}ms`);
+                    log_(`[BACK→FRONT] getSession ${(size / 1024).toFixed(1)}KB ${Math.round(performance.now() - t0)}ms`);
                     if (result && Array.isArray(result.debugLog) && result.debugLog.length) logBackendDebug(result.debugLog, 'getSession');
                     if (result === null || result === undefined) throw new Error('Server returned null');
                     return result;
                 } catch (err) {
                     const raw = await response.text().catch(() => '');
-                    console.error('[BACK->FRONT] getSession JSON parse failed:', err.message, 'raw:', raw.slice ? raw.slice(0, 2000) : raw);
+                    console.error('[BACK→FRONT] getSession JSON parse failed:', err.message, 'raw:', raw.slice ? raw.slice(0, 2000) : raw);
                     throw err;
                 }
             },
@@ -2373,12 +2413,12 @@
                 const contentType = (response.headers.get('Content-Type') || response.headers.get('content-type') || '').toLowerCase();
                 if (!contentType.includes('application/json')) {
                     const text = await response.text();
-                    console.error('[BACK->FRONT] saveSession expected JSON but received:', response.status, text.slice(0, 2000));
+                    console.error('[BACK→FRONT] saveSession expected JSON but received:', response.status, text.slice(0, 2000));
                     throw new Error('Non-JSON response from server: ' + (String(text).slice(0, 1000)));
                 }
                 try {
                     const result = await response.json();
-                    log_(`[BACK->FRONT] saveSession response`, summarizeResult(result));
+                    log_(`[BACK→FRONT] saveSession response`, summarizeResult(result));
                     const tagParts = [];
                     if (payload && payload.deckSettings) tagParts.push('deckSettings');
                     if (payload && payload.userProgress) tagParts.push('userProgress');
@@ -2391,7 +2431,7 @@
                     return result;
                 } catch (err) {
                     const raw = await response.text().catch(() => '');
-                    console.error('[BACK->FRONT] saveSession JSON parse failed:', err.message, 'raw:', raw.slice ? raw.slice(0, 2000) : raw);
+                    console.error('[BACK→FRONT] saveSession JSON parse failed:', err.message, 'raw:', raw.slice ? raw.slice(0, 2000) : raw);
                     throw err;
                 }
             },
