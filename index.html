@@ -1181,6 +1181,10 @@
             <span class="menu-label">Change Password</span>
             <span class="menu-icon">🔐</span>
         </div>
+        <div class="menu-item" id="debugModeMenuItem">
+            <span class="menu-label">Debug Mode</span>
+            <span class="menu-arrow">▶</span>
+        </div>
         <div class="menu-item" id="logoutMenuItem">
             <span class="menu-label">Logout <span id="userIdDisplay"
                     style="font-size: 0.85em; color: #666;"></span></span>
@@ -1205,6 +1209,12 @@
             <span>User Preferences</span>
             <span class="menu-icon" aria-hidden="true">👤</span>
         </div>
+    </div>
+
+    <div id="debugModeSubmenu" class="submenu" hidden>
+        <div id="debugModeOffOption" class="submenu-item"><span>Off</span><span id="debugModeOffCheck" class="submenu-check" aria-hidden="true"></span></div>
+        <div id="debugModeConsoleOption" class="submenu-item"><span>Console</span><span id="debugModeConsoleCheck" class="submenu-check" aria-hidden="true"></span></div>
+        <div id="debugModeScreenOption" class="submenu-item"><span>Screen</span><span id="debugModeScreenCheck" class="submenu-check" aria-hidden="true"></span></div>
     </div>
 
 
@@ -1595,18 +1605,31 @@
         let settingsViewMode = 'set'; // 'set' or 'user' - controls which settings panel is being edited
         let testState = null; // { activeSet, shuffledIndices, currentIndex, score, startTime, totalQuestions }
         // Debug modes:
-        // - 'No'        : no debug output
-        // - 'Regular'   : console logging
-        // - 'Fireglass' : render logs into the DOM (and also try console)
+        // - 'Off'     : no debug output
+        // - 'Console' : console logging
+        // - 'Screen'  : render logs into the DOM (Screen Debug)
         // Set this in code (no persistence)
-        let DEBUG_MODE = 'Fireglass';
-
-        // Extra noisy, component-specific debug (keep OFF by default)
-        const DEBUG_PLAYBACK_SPEED_LOGS = false;
+        let DEBUG_MODE = 'Off';
 
         function setDebugMode(mode) {
             const m = String(mode || '').trim();
-            DEBUG_MODE = (m === 'No' || m === 'Regular' || m === 'Fireglass') ? m : 'Regular';
+
+            DEBUG_MODE = (m === 'Off' || m === 'Console' || m === 'Screen') ? m : 'Console';
+
+            // Show/hide Screen Debug pane when switching.
+            try {
+                if (_debugPane) {
+                    _debugPane.style.display = (DEBUG_MODE === 'Screen') ? 'block' : 'none';
+                }
+            } catch { /* ignore */ }
+
+            // If user switches to Screen and the pane was never created, create it now
+            // so the user gets immediate visual feedback.
+            try {
+                if (DEBUG_MODE === 'Screen' && !_debugPane) {
+                    debug('');
+                }
+            } catch { /* ignore */ }
         }
 
         function formatTs_() {
@@ -1655,7 +1678,7 @@
         let _debugPane = null;
         let _debugScrollHandlersInstalled = false;
         function debug(msg) {
-            // Fireglass-safe: writes to DOM so you can inspect without DevTools.
+            // Screen-debug safe: writes to DOM so you can inspect without DevTools.
             try {
                 const ts = formatTs_();
                 const cleanMsg = String(msg).replace(/^\[DEBUG\]\s*/i, '');
@@ -1672,11 +1695,11 @@
                     } catch (e) { /* ignore */ }
                     // Keep debug pane always light (white) regardless of app theme.
 
-                    // Help line (always visible in Fireglass mode)
+                    // Help line (always visible in Screen mode)
                     try {
                         const help = document.createElement('div');
                         help.id = 'debugPaneHelp';
-                        help.textContent = 'Fireglass: Alt+Wheel scroll · Hold Alt to select/copy · PageUp/PageDown/Home/End scroll';
+                        help.textContent = 'Screen Debug: Alt+Wheel scroll · Hold Alt to select/copy · PageUp/PageDown/Home/End scroll';
                         help.style.cssText = 'font-size:11px;opacity:0.9;white-space:pre-wrap;word-break:break-word;padding:0 0 6px 0;border-bottom:1px solid currentColor;';
                         pane.appendChild(help);
                     } catch (e) { /* ignore */ }
@@ -1705,8 +1728,8 @@
                                 const helpEl = document.getElementById('debugPaneHelp');
                                 if (helpEl) {
                                     helpEl.textContent = on
-                                        ? 'Fireglass (SELECT MODE): drag to select, Ctrl+C to copy · Alt+Wheel scroll'
-                                        : 'Fireglass: Alt+Wheel scroll · Hold Alt to select/copy · PageUp/PageDown/Home/End scroll';
+                                        ? 'Screen Debug (SELECT MODE): drag to select, Ctrl+C to copy · Alt+Wheel scroll'
+                                        : 'Screen Debug: Alt+Wheel scroll · Hold Alt to select/copy · PageUp/PageDown/Home/End scroll';
                                 }
                             } catch (e) { /* ignore */ }
                         };
@@ -1714,26 +1737,26 @@
                         // Toggle select mode while Alt is held down
                         window.addEventListener('keydown', (e) => {
                             try {
-                                if (DEBUG_MODE !== 'Fireglass') return;
+                                if (DEBUG_MODE !== 'Screen') return;
                                 if (e.key === 'Alt') setSelectMode(true);
                             } catch { /* ignore */ }
                         }, true);
                         window.addEventListener('keyup', (e) => {
                             try {
-                                if (DEBUG_MODE !== 'Fireglass') return;
+                                if (DEBUG_MODE !== 'Screen') return;
                                 if (e.key === 'Alt') setSelectMode(false);
                             } catch { /* ignore */ }
                         }, true);
                         window.addEventListener('blur', () => {
                             try {
-                                if (DEBUG_MODE !== 'Fireglass') return;
+                                if (DEBUG_MODE !== 'Screen') return;
                                 setSelectMode(false);
                             } catch { /* ignore */ }
                         });
 
                         window.addEventListener('wheel', (e) => {
                             try {
-                                if (DEBUG_MODE !== 'Fireglass') return;
+                                if (DEBUG_MODE !== 'Screen') return;
                                 if (!_debugPane) return;
                                 // Only when user explicitly intends to scroll logs
                                 if (!e.altKey) return;
@@ -1744,7 +1767,7 @@
 
                         window.addEventListener('keydown', (e) => {
                             try {
-                                if (DEBUG_MODE !== 'Fireglass') return;
+                                if (DEBUG_MODE !== 'Screen') return;
                                 if (!_debugPane) return;
                                 const step = Math.max(40, Math.round((_debugPane.clientHeight || 200) * 0.25));
                                 if (e.key === 'PageUp') { e.preventDefault(); _debugPane.scrollTop -= step; }
@@ -1755,6 +1778,14 @@
                         });
                     }
                 }
+
+                // If mode switched away from Screen before first log, keep it hidden.
+                try {
+                    if (_debugPane) _debugPane.style.display = (DEBUG_MODE === 'Screen') ? 'block' : 'none';
+                } catch { /* ignore */ }
+
+                // Allow creating the pane without writing a line (used when switching to Screen).
+                if (!cleanMsg) return;
                 const el = document.createElement('div');
                 el.textContent = ts ? `${ts} ${cleanMsg}` : cleanMsg;
                 el.style.cssText = 'font-size:12px;color:inherit;opacity:0.95;white-space:pre-wrap;word-break:break-word;';
@@ -1767,7 +1798,7 @@
         }
 
         function log_(...args) {
-            if (DEBUG_MODE === 'No') return;
+            if (DEBUG_MODE === 'Off') return;
             const ts = formatTs_();
             const parts = args.map(a => {
                 if (a instanceof Error) return `${a.message}\n${a.stack || ''}`.trim();
@@ -1775,7 +1806,7 @@
                 try { return JSON.stringify(a); } catch (e) { return String(a); }
             });
             const line = parts.join(' ').replace(/^\[DEBUG\]\s*/i, '');
-            if (DEBUG_MODE === 'Fireglass') {
+            if (DEBUG_MODE === 'Screen') {
                 debug(line);
                 return;
             }
@@ -3301,9 +3332,6 @@
 
                         const parsedVal = Number(value);
                         const initialVal = Number.isFinite(parsedVal) ? parsedVal : 1.5;
-                        if (DEBUG_MODE === 'Fireglass' && DEBUG_PLAYBACK_SPEED_LOGS) {
-                            log_('[PlaybackSpeed] row value=', value, 'parsedVal=', parsedVal, 'initialVal=', initialVal);
-                        }
 
                         ctrl = document.createElement('input');
                         ctrl.type = 'range';
@@ -3311,9 +3339,6 @@
                         ctrl.max = '4';
                         ctrl.step = '0.25';
                         ctrl.value = String(initialVal);
-                        if (DEBUG_MODE === 'Fireglass' && DEBUG_PLAYBACK_SPEED_LOGS) {
-                            log_('[PlaybackSpeed] ctrl.value after set=', ctrl.value);
-                        }
                         r[1] = initialVal; // keep row normalized and in sync with the slider
                         // Force LTR on the slider to prevent RTL reversal (thumb position must match value)
                         ctrl.style.direction = 'ltr';
@@ -5414,10 +5439,12 @@
             // Close all submenus helper (define first)
             const studySetSubmenu = $('studySetSubmenu');
             const suspendSubmenu = $('suspendSubmenu');
+            const debugModeSubmenu = $('debugModeSubmenu');
             const closeAllSubmenus = () => {
                 if (studySetSubmenu) studySetSubmenu.hidden = true;
                 if (suspendSubmenu) suspendSubmenu.hidden = true;
                 if (settingsOptionsSubmenu) settingsOptionsSubmenu.hidden = true;
+                if (debugModeSubmenu) debugModeSubmenu.hidden = true;
             };
 
             // Menu item handlers
@@ -5425,10 +5452,33 @@
             const testModeMenuItem = $('testModeMenuItem');
             const suspendMenuItem = $('suspendMenuItem');
             const settingsMenuItem = $('settingsMenuItem');
+            const debugModeMenuItem = $('debugModeMenuItem');
             const settingsOptionsSubmenu = $('settingsOptionsSubmenu');
             const setSettingsOption = $('setSettingsOption');
             const userPreferencesOption = $('userPreferencesOption');
             // settingsViewMode is declared globally; don't redeclare here
+
+            // Debug mode submenu options
+            const debugModeOffOption = $('debugModeOffOption');
+            const debugModeConsoleOption = $('debugModeConsoleOption');
+            const debugModeScreenOption = $('debugModeScreenOption');
+            const debugModeOffCheck = $('debugModeOffCheck');
+            const debugModeConsoleCheck = $('debugModeConsoleCheck');
+            const debugModeScreenCheck = $('debugModeScreenCheck');
+
+            function updateDebugModeChecks_() {
+                try {
+                    const set = (optEl, checkEl, mode) => {
+                        if (!optEl || !checkEl) return;
+                        const isActive = (DEBUG_MODE === mode);
+                        optEl.classList.toggle('active', isActive);
+                        checkEl.textContent = isActive ? '✓' : '';
+                    };
+                    set(debugModeOffOption, debugModeOffCheck, 'Off');
+                    set(debugModeConsoleOption, debugModeConsoleCheck, 'Console');
+                    set(debugModeScreenOption, debugModeScreenCheck, 'Screen');
+                } catch (e) { /* ignore */ }
+            }
 
             function positionSubmenuAtMenuItem(submenu, menuItem) {
                 if (!submenu || !menuItem || !menuDropdown) return;
@@ -5505,6 +5555,28 @@
                     }
                 });
             }
+
+            if (debugModeMenuItem && debugModeSubmenu) {
+                debugModeMenuItem.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    closeAllSubmenus();
+                    updateDebugModeChecks_();
+                    positionSubmenuAtMenuItem(debugModeSubmenu, debugModeMenuItem);
+                });
+            }
+
+            const pickDebugMode_ = (mode) => {
+                try {
+                    setDebugMode(mode);
+                } catch (e) { /* ignore */ }
+                updateDebugModeChecks_();
+                // Close only the submenu; keep the main menu open.
+                if (debugModeSubmenu) debugModeSubmenu.hidden = true;
+            };
+
+            if (debugModeOffOption) debugModeOffOption.addEventListener('click', (e) => { e.stopPropagation(); pickDebugMode_('Off'); });
+            if (debugModeConsoleOption) debugModeConsoleOption.addEventListener('click', (e) => { e.stopPropagation(); pickDebugMode_('Console'); });
+            if (debugModeScreenOption) debugModeScreenOption.addEventListener('click', (e) => { e.stopPropagation(); pickDebugMode_('Screen'); });
             if (setSettingsOption) {
                 setSettingsOption.addEventListener('click', async (e) => {
                     e.stopPropagation();
