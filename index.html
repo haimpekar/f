@@ -1658,6 +1658,7 @@
             // Fireglass-safe: writes to DOM so you can inspect without DevTools.
             try {
                 const ts = formatTs_();
+                const cleanMsg = String(msg).replace(/^\[DEBUG\]\s*/i, '');
                 if (!_debugPane) {
                     const pane = document.createElement('div');
                     pane.id = 'debugPane';
@@ -1755,7 +1756,7 @@
                     }
                 }
                 const el = document.createElement('div');
-                el.textContent = ts ? `${ts} ${String(msg)}` : String(msg);
+                el.textContent = ts ? `${ts} ${cleanMsg}` : cleanMsg;
                 el.style.cssText = 'font-size:12px;color:inherit;opacity:0.95;white-space:pre-wrap;word-break:break-word;';
                 _debugPane.appendChild(el);
                 // Keep latest visible
@@ -1773,12 +1774,12 @@
                 if (typeof a === 'string') return a;
                 try { return JSON.stringify(a); } catch (e) { return String(a); }
             });
-            const line = parts.join(' ');
+            const line = parts.join(' ').replace(/^\[DEBUG\]\s*/i, '');
             if (DEBUG_MODE === 'Fireglass') {
-                debug(`[DEBUG] ${line}`);
+                debug(line);
                 return;
             }
-            try { console.log('[DEBUG]', ...args); } catch (e) { /* ignore */ }
+            try { console.log(...args); } catch (e) { /* ignore */ }
         }
         function logBackendDebug(entries, label) {
             if (!Array.isArray(entries) || entries.length === 0) return;
@@ -2259,9 +2260,21 @@
                         // reflects the newly-saved settings/progress immediately.
                         try {
                             if (typeof DeckCache !== 'undefined') {
+                                // Only deck-scoped saves should update DeckCache.
+                                // Global user preferences (`userSettings`) can be saved when activeSet=null.
+                                const hasDeckDelta = !!(item && item.data && (item.data.deckSettings !== undefined || item.data.userProgress !== undefined));
+                                if (!hasDeckDelta) {
+                                    // No deck to update; skip silently.
+                                    continue;
+                                }
+
                                 const activeSetName = payload?.activeSet || creds.activeSet || currentCredentials?.activeSet;
+                                // When no active set is selected (activeSet=null), there's no deck cache to update.
+                                if (!activeSetName) {
+                                    continue;
+                                }
                                 const cacheKey = getDeckCacheKey(activeSetName);
-                                if (!cacheKey) throw new Error('No active set cache key');
+                                if (!cacheKey) continue;
                                 const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
                                 const cachedSession = {
                                     cards: Array.isArray(payload?.items) ? payload.items.map(r => Array.isArray(r) ? r.slice(0, cardWidth) : []) : [],
@@ -3272,6 +3285,15 @@
                         wrapper.style.flexDirection = 'column';
                         wrapper.style.alignItems = 'center';
 
+                        // Force LTR at container level as well. Some browsers compute the range thumb
+                        // position using ancestor direction, which can make the thumb look "stuck".
+                        wrapper.style.direction = 'ltr';
+                        wrapper.setAttribute('dir', 'ltr');
+                        try {
+                            ctrlWrap.style.direction = 'ltr';
+                            ctrlWrap.setAttribute('dir', 'ltr');
+                        } catch (e) { /* ignore */ }
+
                         const valueEl = document.createElement('div');
                         valueEl.style.textAlign = 'center';
                         valueEl.style.marginBottom = '6px';
@@ -3309,6 +3331,16 @@
                         ctrlWrap.appendChild(wrapper);
                         // Mark ctrl as already appended so later code does not append again
                         ctrl._appendedViaWrapper = true;
+
+                        // After insertion, re-apply the value once so the thumb matches ctrl.value visually.
+                        try {
+                            setTimeout(() => {
+                                try {
+                                    ctrl.value = String(initialVal);
+                                    ctrl.dispatchEvent(new Event('input', { bubbles: true }));
+                                } catch (e) { /* ignore */ }
+                            }, 0);
+                        } catch (e) { /* ignore */ }
                     } else if (name === 'QuizMode' || name === 'ThemeLight' || name === 'AudioAutoPlay') {
                         ctrl = document.createElement('select');
                         const opts = [['true', 'Yes'], ['false', 'No']];
