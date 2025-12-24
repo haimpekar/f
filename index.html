@@ -1669,14 +1669,7 @@
                         pane.style.userSelect = 'text';
                         pane.style.webkitUserSelect = 'text';
                     } catch (e) { /* ignore */ }
-                    // In dark theme, keep pane readable
-                    try {
-                        if (document.body && document.body.dataset && document.body.dataset.theme === 'dark') {
-                            pane.style.background = 'rgba(20,20,22,0.92)';
-                            pane.style.borderTop = '1px solid #333';
-                            pane.style.color = '#bbb';
-                        }
-                    } catch (e) { /* ignore */ }
+                    // Keep debug pane always light (white) regardless of app theme.
 
                     // Help line (always visible in Fireglass mode)
                     try {
