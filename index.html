@@ -1397,21 +1397,36 @@
         function summarizeResult(result) {
             if (!result || typeof result !== 'object') return result;
             const summary = {};
+            const INLINE_MATRIX_MAX_ROWS = 25;
+            const INLINE_ARRAY_MAX_ROWS = 20;
+            const INLINE_MAX_CHARS = 2000;
+            const inlineOrLabel = (arr, label, maxRows) => {
+                if (!Array.isArray(arr)) return arr;
+                if (arr.length <= (maxRows ?? INLINE_ARRAY_MAX_ROWS)) {
+                    try {
+                        const s = JSON.stringify(arr);
+                        if (s.length <= INLINE_MAX_CHARS) return arr;
+                    } catch (e) {
+                        return arr;
+                    }
+                }
+                return `${label}[${arr.length}]`;
+            };
             ['success', 'error', 'userId', 'activeSet', 'availableSets', 'adminEmail'].forEach(key => {
                 if (Object.prototype.hasOwnProperty.call(result, key)) {
                     summary[key] = result[key];
                 }
             });
             if (Array.isArray(result.cards)) summary.cards = `cards[${result.cards.length}]`;
-            if (Array.isArray(result.userSettings)) summary.userSettings = `settings[${result.userSettings.length}]`;
+            if (Array.isArray(result.userSettings)) summary.userSettings = inlineOrLabel(result.userSettings, 'settings', INLINE_MATRIX_MAX_ROWS);
             if (Array.isArray(result.userProgress)) summary.userProgress = `progress[${result.userProgress.length}]`;
-            if (Array.isArray(result.availableSets)) summary.availableSets = `availableSets[${result.availableSets.length}]`;
+            if (Array.isArray(result.availableSets)) summary.availableSets = inlineOrLabel(result.availableSets, 'availableSets', INLINE_ARRAY_MAX_ROWS);
 
             // Global user settings (from Users sheet) are returned as:
             // - userPreferences: a 2-col matrix including header + UserID + the global keys
             try {
                 if (Array.isArray(result.userPreferences)) {
-                    summary.userPreferences = `userPreferences[${result.userPreferences.length}]`;
+                    summary.userPreferences = inlineOrLabel(result.userPreferences, 'userPreferences', INLINE_MATRIX_MAX_ROWS);
                 }
             } catch (e) {
                 // ignore
@@ -2919,6 +2934,7 @@
         function updateSessionStats() {
             const el = $('statusBarText');
             if (!el) return;
+            if (!payload || !payload.state) return;
             const stats = computeSessionStats();
             const deckName = payload?.activeSet || '';
 
@@ -5716,8 +5732,10 @@
                     if (testState) {
                         renderTestQuestion();
                     } else {
-                        updateSessionStats();
-                        if (payload && payload.state && payload.state.currentIndex >= 0) renderTerm();
+                        if (payload && payload.state) {
+                            updateSessionStats();
+                            if (payload.state.currentIndex >= 0) renderTerm();
+                        }
                     }
                 } catch (e) {
                     log_('Failed to revert settings preview on cancel', e);
