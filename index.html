@@ -5214,6 +5214,17 @@
                 if (flipCard) flipCard.classList.add('flash-incorrect');
                 if (chosenIndex >= 0 && noBtn) noBtn.classList.add('picked');
                 if (okBtn) okBtn.classList.add('hint'); // subtle cue for the correct button
+
+                // Replay audio on wrong answer only in AudioOnly mode.
+                try {
+                    const audioBtn = $('audioBtn');
+                    const isAudioOnlyMode = !!(audioBtn && audioBtn.classList && audioBtn.classList.contains('audio-only-mode'));
+                    if (isAudioOnlyMode && _currentAudioUrl) {
+                        playAudioUrl(_currentAudioUrl);
+                    }
+                } catch (e) {
+                    // ignore
+                }
             }
 
             // Disable further input for BOTH modes
