@@ -1165,6 +1165,10 @@
             <span class="menu-label" id="testModeLabel">Test Mode</span>
             <span class="menu-icon" id="testModeIcon">🧪</span>
         </div>
+        <div class="menu-item" id="placementModeMenuItem" hidden>
+            <span class="menu-label" id="placementModeLabel">Placement Mode</span>
+            <span class="menu-icon" id="placementModeIcon">🎯</span>
+        </div>
         <div class="menu-item" id="suspendMenuItem">
             <span class="menu-label">Suspend</span>
             <span class="menu-arrow">▶</span>
@@ -1604,6 +1608,7 @@
         let userPreferences = []; // global user preferences (separate from deck settings)
         let settingsViewMode = 'set'; // 'set' or 'user' - controls which settings panel is being edited
         let testState = null; // { activeSet, shuffledIndices, currentIndex, score, startTime, totalQuestions }
+        let placementState = null; // Adaptive corpus placement test state
         // Debug modes:
         // - 'Off'     : no debug output
         // - 'Console' : console logging
@@ -2563,6 +2568,14 @@
                         if (idx >= 0) MOCK_USER_PREFERENCES[idx][1] = r[1];
                     });
                 }
+
+                if (Array.isArray(payload?.userProgress)) {
+                    payload.userProgress.forEach((r, i) => {
+                        if (Array.isArray(r) && Array.isArray(MOCK_PROGRESS[i])) {
+                            MOCK_PROGRESS[i] = r.slice();
+                        }
+                    });
+                }
                 return { success: true };
             },
             async changePassword(arg) {
@@ -3502,6 +3515,488 @@
             return n;
         }
 
+
+        // Corpus placement mode
+        // A corpus deck is detected only by sheet name. No new sheet columns/settings are required.
+        // Existing userProgress fields are reused:
+        // - suspended = true for skipped words
+        // - tags includes placement_auto and placement_done
+        const PLACEMENT_AUTO_TAG = 'placement_auto';
+        const PLACEMENT_DONE_TAG = 'placement_done';
+        const PLACEMENT_CORPUS_RE = /^CORPUS[_\s-]/i;
+        const PLACEMENT_TARGET_KNOWN_RATE = 0.92;
+        const PLACEMENT_REQUIRED_CONFIDENCE = 0.85;
+        const PLACEMENT_MIN_QUESTIONS = 20;
+        const PLACEMENT_MAX_QUESTIONS = 60;
+
+        function isTruthyCell_(value) {
+            if (value === true) return true;
+            if (value === false || value === null || value === undefined) return false;
+            const s = String(value).trim().toLowerCase();
+            return s === 'true' || s === '1' || s === 'yes' || s === 'y';
+        }
+
+        function isCorpusSetName(setName) {
+            return PLACEMENT_CORPUS_RE.test(String(setName || '').trim());
+        }
+
+        function addTagToCell_(value, tag) {
+            const parts = String(value || '')
+                .split(/[;,\s]+/)
+                .map(x => x.trim())
+                .filter(Boolean);
+            if (!parts.includes(tag)) parts.push(tag);
+            return parts.join(';');
+        }
+
+        function hasPlacementMarkerInPayload_() {
+            if (!payload || !Array.isArray(payload.items)) return false;
+            const C = payload.schema?.lexiconCols || buildLexiconSchema(STUDY_SET_SCHEMA, USER_PROGRESS_SCHEMA);
+            return payload.items.some(row => {
+                const tags = String(row?.[C.tags] || '');
+                const parts = tags.split(/[;,\s]+/);
+                return parts.includes(PLACEMENT_AUTO_TAG) || parts.includes(PLACEMENT_DONE_TAG);
+            });
+        }
+
+        function hasStartedLearningCorpus_() {
+            if (!payload || !Array.isArray(payload.items)) return false;
+            const C = payload.schema?.lexiconCols || buildLexiconSchema(STUDY_SET_SCHEMA, USER_PROGRESS_SCHEMA);
+            return payload.items.some(row => {
+                if (!row) return false;
+                const due = String(row[C.due] ?? '').trim();
+                const step = Number(row[C.step] || 0);
+                const reps = Number(row[C.reps] || 0);
+                const lapses = Number(row[C.lapses] || 0);
+                const suspended = isTruthyCell_(row[C.suspended]);
+                const tags = String(row[C.tags] ?? '').trim();
+                return !!due || step > 0 || reps > 0 || lapses > 0 || suspended || !!tags;
+            });
+        }
+
+        function shouldShowPlacementMode() {
+            if (!payload || !payload.activeSet) return false;
+            if (!isCorpusSetName(payload.activeSet)) return false;
+            if (hasPlacementMarkerInPayload_()) return false;
+            if (hasStartedLearningCorpus_()) return false;
+            return true;
+        }
+
+        function syncPlacementMenuVisibility() {
+            const item = $('placementModeMenuItem');
+            const label = $('placementModeLabel');
+            const icon = $('placementModeIcon');
+            if (!item) return;
+            const active = !!placementState;
+            const visible = active || shouldShowPlacementMode();
+            item.hidden = !visible;
+            item.style.display = visible ? '' : 'none';
+            item.style.opacity = visible ? '' : '0.5';
+            item.style.pointerEvents = visible ? '' : 'none';
+            if (label) label.textContent = active ? 'Learn Mode' : 'Placement Mode';
+            if (icon) icon.textContent = active ? '📚' : '🎯';
+        }
+
+        function placementQuestionRank_(idx) {
+            return Number(idx) + 1;
+        }
+
+        function clamp_(x, lo, hi) {
+            return Math.max(lo, Math.min(hi, x));
+        }
+
+        function logit_(p) {
+            const x = clamp_(Number(p), 0.001, 0.999);
+            return Math.log(x / (1 - x));
+        }
+
+        function placementKnownProbability_(rank, boundaryRank, scale, targetKnownRate) {
+            const z = logit_(targetKnownRate) - ((rank - boundaryRank) / scale);
+            const p = 1 / (1 + Math.exp(-z));
+            return clamp_(p, 0.02, 0.98);
+        }
+
+        function weightedQuantile_(points, q) {
+            if (!points.length) return 1;
+            const sorted = points.slice().sort((a, b) => a.rank - b.rank);
+            const total = sorted.reduce((acc, p) => acc + p.w, 0) || 1;
+            let run = 0;
+            for (const p of sorted) {
+                run += p.w;
+                if (run / total >= q) return p.rank;
+            }
+            return sorted[sorted.length - 1].rank;
+        }
+
+        function labelConfidence_(confidence) {
+            if (confidence >= 0.85) return 'High';
+            if (confidence >= 0.60) return 'Medium';
+            return 'Low';
+        }
+
+        function computePlacementConsistencyFactor_(answers, boundaryRank, scale, target) {
+            if (!answers.length) return 1;
+            let absErr = 0;
+            for (const a of answers) {
+                const predicted = placementKnownProbability_(a.rank, boundaryRank, scale, target);
+                absErr += Math.abs(predicted - clamp_(Number(a.score || 0), 0, 1));
+            }
+            const mae = absErr / answers.length;
+            return clamp_(1 - (mae - 0.20) / 0.45, 0.45, 1);
+        }
+
+        function recomputePlacementEstimate_() {
+            if (!placementState) return;
+            const answers = placementState.answers || [];
+            const n = Math.max(1, Number(placementState.totalCards || payload?.items?.length || 1));
+            if (!answers.length) {
+                placementState.estimatedRank = Math.max(1, Math.round(n * 0.25));
+                placementState.safeStartRank = 1;
+                placementState.confidence = 0;
+                placementState.confidenceLabel = 'Low';
+                placementState.ciLow = 1;
+                placementState.ciHigh = n;
+                return;
+            }
+
+            const gridCount = Math.min(120, Math.max(40, Math.round(Math.sqrt(n) * 3)));
+            const scale = Math.max(80, n / 10);
+            const target = Number(placementState.targetKnownRate || PLACEMENT_TARGET_KNOWN_RATE);
+            const candidates = [];
+            let maxLog = -Infinity;
+
+            for (let g = 0; g < gridCount; g++) {
+                const rank = Math.max(1, Math.round(1 + (g * (n - 1)) / Math.max(1, gridCount - 1)));
+                let ll = 0;
+                for (const a of answers) {
+                    const score = clamp_(Number(a.score || 0), 0, 1);
+                    const p = placementKnownProbability_(a.rank, rank, scale, target);
+                    ll += score * Math.log(p) + (1 - score) * Math.log(1 - p);
+                }
+                if (ll > maxLog) maxLog = ll;
+                candidates.push({ rank, ll, w: 0 });
+            }
+
+            let sumW = 0;
+            for (const c of candidates) {
+                c.w = Math.exp(c.ll - maxLog);
+                sumW += c.w;
+            }
+            if (!sumW || !Number.isFinite(sumW)) sumW = 1;
+
+            const mean = candidates.reduce((acc, c) => acc + c.rank * (c.w / sumW), 0);
+            const q05 = weightedQuantile_(candidates, 0.05);
+            const q50 = weightedQuantile_(candidates, 0.50);
+            const q95 = weightedQuantile_(candidates, 0.95);
+            const ciWidth = Math.max(1, q95 - q05);
+            const questionFactor = clamp_(answers.length / PLACEMENT_MIN_QUESTIONS, 0, 1);
+            const uncertaintyFactor = clamp_(1 - (ciWidth / Math.max(10, n * 0.55)), 0, 1);
+            const consistencyFactor = computePlacementConsistencyFactor_(answers, q50, scale, target);
+            const confidence = clamp_(questionFactor * uncertaintyFactor * consistencyFactor, 0, 0.99);
+
+            const estimate = Math.max(1, Math.min(n, Math.round(q50 || mean || 1)));
+            const safeStart = Math.max(1, Math.min(n, Math.floor(estimate * 0.90)));
+
+            placementState.estimatedRank = estimate;
+            placementState.safeStartRank = safeStart;
+            placementState.confidence = confidence;
+            placementState.confidenceLabel = labelConfidence_(confidence);
+            placementState.ciLow = q05;
+            placementState.ciHigh = q95;
+            placementState.estimateHistory = placementState.estimateHistory || [];
+            placementState.estimateHistory.push(estimate);
+            if (placementState.estimateHistory.length > 12) placementState.estimateHistory.shift();
+        }
+
+        function placementEstimateStable_() {
+            if (!placementState || !Array.isArray(placementState.estimateHistory)) return false;
+            const hist = placementState.estimateHistory.slice(-5);
+            if (hist.length < 5) return false;
+            const n = Math.max(1, Number(placementState.totalCards || 1));
+            const spread = Math.max(...hist) - Math.min(...hist);
+            return spread <= Math.max(75, n * 0.08);
+        }
+
+        function placementShouldStop_() {
+            if (!placementState) return false;
+            const answered = placementState.answers.length;
+            if (answered >= PLACEMENT_MAX_QUESTIONS) return true;
+            return answered >= PLACEMENT_MIN_QUESTIONS
+                && placementState.confidence >= PLACEMENT_REQUIRED_CONFIDENCE
+                && placementEstimateStable_();
+        }
+
+        function updatePlacementHeader_() {
+            const sb = $('statusBarText');
+            if (!sb || !placementState) return;
+            const q = placementState.answers.length;
+            const est = Math.max(1, Math.round(placementState.estimatedRank || 1));
+            const confPct = Math.round((placementState.confidence || 0) * 100);
+            sb.innerHTML = `<span dir="ltr">Placement · L≈${est} · C ${confPct}% · Q ${q}</span>`;
+        }
+
+        function findNearestUntestedPlacementIndex_(targetRank) {
+            if (!payload || !Array.isArray(payload.items) || !placementState) return -1;
+            const n = payload.items.length;
+            if (!n) return -1;
+            const center = clamp_(Math.round(targetRank) - 1, 0, n - 1);
+            const used = placementState.answeredByIndex || {};
+            for (let d = 0; d < n; d++) {
+                const left = center - d;
+                if (left >= 0 && !used[left]) return left;
+                const right = center + d;
+                if (right < n && !used[right]) return right;
+            }
+            return -1;
+        }
+
+        function chooseNextPlacementIndex_() {
+            if (!payload || !placementState) return -1;
+            const n = payload.items.length;
+            if (!n) return -1;
+            const q = placementState.answers.length;
+            const probes = [0.03, 0.08, 0.15, 0.28, 0.45, 0.65, 0.82];
+            if (q < probes.length) {
+                return findNearestUntestedPlacementIndex_(Math.max(1, Math.round(n * probes[q])));
+            }
+
+            const est = clamp_(Number(placementState.estimatedRank || Math.round(n * 0.25)), 1, n);
+            const cycle = q % 10;
+            let target;
+            if (cycle === 8) target = est * 0.55;
+            else if (cycle === 9) target = est * 1.60;
+            else {
+                const offsets = [-0.24, 0.16, -0.12, 0.08, 0, 0.24, -0.18, 0.12];
+                target = est * (1 + offsets[q % offsets.length]);
+            }
+            return findNearestUntestedPlacementIndex_(clamp_(target, 1, n));
+        }
+
+        function startPlacementMode() {
+            if (!payload || !Array.isArray(payload.items) || !payload.items.length) {
+                showError_('No corpus set loaded');
+                return;
+            }
+            if (testState) {
+                showToast('Exit Test Mode before starting Placement Mode', 'error');
+                return;
+            }
+            if (!isCorpusSetName(payload.activeSet)) {
+                showToast('Placement Mode is only available for CORPUS_ sets', 'error');
+                return;
+            }
+            if (!shouldShowPlacementMode()) {
+                showToast('Placement Mode is available only before this corpus is started', 'error');
+                syncPlacementMenuVisibility();
+                return;
+            }
+
+            placementState = {
+                activeSet: payload.activeSet,
+                targetKnownRate: PLACEMENT_TARGET_KNOWN_RATE,
+                requiredConfidence: PLACEMENT_REQUIRED_CONFIDENCE,
+                minQuestions: PLACEMENT_MIN_QUESTIONS,
+                maxQuestions: PLACEMENT_MAX_QUESTIONS,
+                totalCards: payload.items.length,
+                currentIndex: -1,
+                answers: [],
+                answeredByIndex: {},
+                estimatedRank: 1,
+                safeStartRank: 1,
+                confidence: 0,
+                confidenceLabel: 'Low',
+                ciLow: 1,
+                ciHigh: payload.items.length,
+                estimateHistory: []
+            };
+            recomputePlacementEstimate_();
+            syncPlacementMenuVisibility();
+            $('quizArea').classList.remove('hidden');
+            $('doneArea').classList.add('hidden');
+            renderPlacementQuestion();
+        }
+
+        function renderPlacementQuestion() {
+            stopAudio();
+            if (!placementState) return;
+            if (placementShouldStop_()) {
+                showPlacementSummary();
+                return;
+            }
+
+            const idx = chooseNextPlacementIndex_();
+            if (idx < 0) {
+                showPlacementSummary();
+                return;
+            }
+            placementState.currentIndex = idx;
+            const C = payload.schema.lexiconCols;
+            const row = payload.items[idx];
+            const term = String(row[C.term] || '');
+            const qEl = $('termText');
+            const answersEl = $('answers');
+            const termHeader = $('termHeader');
+            const suspendBtn = $('suspendBtn');
+            const rank = placementQuestionRank_(idx);
+
+            if (suspendBtn) suspendBtn.hidden = true;
+            termHeader?.removeAttribute('data-hide');
+            qEl.classList.add('autoshrink');
+            qEl.textContent = term;
+            setupAudioForRow(row, false);
+            setupImageForRow(row, term);
+
+            setFeedback_(`Rank ${rank}. Choose honestly; the goal is level estimation, not score.`);
+            answersEl.innerHTML = '';
+            answersEl.classList.remove('is-flash');
+            answersEl.dataset.count = '3';
+
+            const options = [
+                { label: '✓ I know it', score: 1 },
+                { label: 'Almost', score: 0.5 },
+                { label: '✗ I do not know it', score: 0 }
+            ];
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'answer';
+                const span = document.createElement('span');
+                span.className = 'answer-label';
+                span.textContent = opt.label;
+                btn.appendChild(span);
+                btn.onclick = () => onPlacementAnswer(opt.score);
+                answersEl.appendChild(btn);
+            });
+            updatePlacementHeader_();
+            setTimeout(autoshrinkAll, 0);
+        }
+
+        function onPlacementAnswer(score) {
+            if (!placementState) return;
+            const idx = placementState.currentIndex;
+            if (idx < 0 || idx >= payload.items.length) return;
+            const C = payload.schema.lexiconCols;
+            const row = payload.items[idx];
+            const rank = placementQuestionRank_(idx);
+            placementState.answeredByIndex[idx] = true;
+            placementState.answers.push({ index: idx, rank, score: clamp_(score, 0, 1) });
+            recomputePlacementEstimate_();
+            updatePlacementHeader_();
+
+            document.querySelectorAll('.answer').forEach(b => { b.disabled = true; b.classList.add('disabled'); });
+            const def = String(row[C.definition] || '').trim();
+            const doneNext = placementShouldStop_();
+            setFeedback_(`<span class="success">Recorded.</span> ${def ? `Definition: ${escapeHtmlText_(def)}<br>` : ''}${doneNext ? 'Confidence target reached. Continue to result.' : 'Tap/click anywhere or press any key to continue.'}`);
+
+            let continueTimer = null;
+            const done = () => {
+                if (continueTimer) {
+                    clearTimeout(continueTimer);
+                    continueTimer = null;
+                }
+                document.removeEventListener('keydown', onKey, true);
+                document.removeEventListener('click', onClick, true);
+                if (doneNext) showPlacementSummary();
+                else renderPlacementQuestion();
+            };
+            const onKey = () => done();
+            const onClick = () => done();
+            document.addEventListener('keydown', onKey, true);
+            document.addEventListener('click', onClick, true);
+            continueTimer = setTimeout(done, score >= 1 ? 650 : 1200);
+        }
+
+        function escapeHtmlText_(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function showPlacementSummary() {
+            if (!placementState) return;
+            const qEl = $('termText');
+            const answersEl = $('answers');
+            const suspendBtn = $('suspendBtn');
+            const termHeader = $('termHeader');
+            if (suspendBtn) suspendBtn.hidden = true;
+            termHeader?.removeAttribute('data-hide');
+            const est = Math.max(1, Math.round(placementState.estimatedRank || 1));
+            const start = Math.max(1, Math.round(placementState.safeStartRank || 1));
+            const confPct = Math.round((placementState.confidence || 0) * 100);
+            const skipped = Math.max(0, start - 1);
+            qEl.classList.add('autoshrink');
+            qEl.textContent = 'Placement complete';
+            updatePlacementHeader_();
+            setFeedback_(`Estimated known boundary: rank ${est}. Safe learning start: rank ${start}. Confidence: ${confPct}% (${placementState.confidenceLabel}).`);
+            answersEl.innerHTML = '';
+            answersEl.classList.remove('is-flash');
+            answersEl.dataset.count = '3';
+
+            const addAction = (label, onClick) => {
+                const btn = document.createElement('button');
+                btn.className = 'answer';
+                const span = document.createElement('span');
+                span.className = 'answer-label';
+                span.textContent = label;
+                btn.appendChild(span);
+                btn.onclick = onClick;
+                answersEl.appendChild(btn);
+            };
+
+            addAction(`Apply: skip ${skipped} easier words`, () => applyPlacementResult_(start));
+            addAction('Retake placement', () => startPlacementMode());
+            addAction('Start from beginning', () => markPlacementDoneOnly_());
+            setTimeout(autoshrinkAll, 0);
+        }
+
+        function savePlacementProgress_() {
+            const cardWidth = Object.keys(STUDY_SET_SCHEMA).length;
+            const userProgress = payload.items.map(row => row.slice(cardWidth));
+            SaveQueue.add('checkpoint', { userProgress });
+        }
+
+        function applyPlacementResult_(startRank) {
+            if (!payload || !Array.isArray(payload.items)) return;
+            const C = payload.schema.lexiconCols;
+            const maxSkipIndex = Math.max(0, Math.min(payload.items.length, Number(startRank || 1) - 1));
+            for (let i = 0; i < maxSkipIndex; i++) {
+                const row = payload.items[i];
+                if (!row) continue;
+                row[C.suspended] = true;
+                row[C.tags] = addTagToCell_(row[C.tags], PLACEMENT_AUTO_TAG);
+            }
+            if (payload.items.length) {
+                payload.items[0][C.tags] = addTagToCell_(payload.items[0][C.tags], PLACEMENT_DONE_TAG);
+            }
+            savePlacementProgress_();
+            showToast(`Placement applied: skipped ${maxSkipIndex} words`);
+            placementState = null;
+            syncPlacementMenuVisibility();
+            if (payload.state) payload.state.currentIndex = -1;
+            goNext();
+        }
+
+        function markPlacementDoneOnly_() {
+            if (!payload || !Array.isArray(payload.items) || !payload.items.length) return;
+            const C = payload.schema.lexiconCols;
+            payload.items[0][C.tags] = addTagToCell_(payload.items[0][C.tags], PLACEMENT_DONE_TAG);
+            savePlacementProgress_();
+            showToast('Placement skipped. Starting from the beginning.');
+            placementState = null;
+            syncPlacementMenuVisibility();
+            if (payload.state) payload.state.currentIndex = -1;
+            goNext();
+        }
+
+        function exitPlacementMode() {
+            placementState = null;
+            syncPlacementMenuVisibility();
+            if (payload && payload.state) payload.state.currentIndex = -1;
+            goNext();
+        }
+
         function startTestMode() {
             if (!payload || !payload.items || payload.items.length === 0) {
                 showError_('No study set loaded');
@@ -3910,6 +4405,7 @@
 
                     // Reset state before loading new set
                     testState = null;
+                    placementState = null;
                     payload = null;
                     settings = [];
                     _lastSavedAnswerCount = 0;
@@ -3958,7 +4454,7 @@
                 }
             }
 
-            ['testModeMenuItem', 'suspendMenuItem'].forEach(id => {
+            ['testModeMenuItem', 'suspendMenuItem', 'placementModeMenuItem'].forEach(id => {
                 const el = $(id);
                 if (el) {
                     el.style.opacity = '0.5';
@@ -3971,6 +4467,7 @@
                 setSettingsEl.style.opacity = '0.5';
                 setSettingsEl.style.pointerEvents = 'none';
             }
+            syncPlacementMenuVisibility();
         }
 
         function enableMenuItems(sess) {
@@ -3988,7 +4485,7 @@
                 }
             }
 
-            ['testModeMenuItem', 'suspendMenuItem'].forEach(id => {
+            ['testModeMenuItem', 'suspendMenuItem', 'placementModeMenuItem'].forEach(id => {
                 const el = $(id);
                 if (el) {
                     if (hasActiveSet) {
@@ -4011,6 +4508,7 @@
                     setSettingsEl.style.pointerEvents = 'none';
                 }
             }
+            syncPlacementMenuVisibility();
         }
 
         function buildPayload(sess) {
@@ -4326,6 +4824,7 @@
                         payload = buildPayload(cachedSess);
                         settings = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
                         userPreferences = payload.userPreferences ? payload.userPreferences.map(r => Array.isArray(r) ? r.slice() : []) : [];
+                        syncPlacementMenuVisibility();
 
                         // Persisted daily cap: ensure keys exist and reset on day rollover.
                         normalizeDailyNewCap_({ persist: true });
@@ -4418,6 +4917,7 @@
                         payload = buildPayload(sess);
                         settings = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
                         userPreferences = payload.userPreferences ? payload.userPreferences.map(r => Array.isArray(r) ? r.slice() : []) : [];
+                        syncPlacementMenuVisibility();
 
                         // Persisted daily cap: ensure keys exist and reset on day rollover.
                         normalizeDailyNewCap_({ persist: true });
@@ -4459,6 +4959,7 @@
                 // Active settings (editable copy for this run)
                 settings = payload.settings.map(r => Array.isArray(r) ? r.slice() : []);
                 userPreferences = payload.userPreferences ? payload.userPreferences.map(r => Array.isArray(r) ? r.slice() : []) : [];
+                syncPlacementMenuVisibility();
                 log_('[boot] Active settings copied, length=' + settings.length);
                 log_('[boot] Active settings:', JSON.stringify(settings));
 
@@ -5461,6 +5962,7 @@
             // Menu item handlers
             const studySetMenuItem = $('studySetMenuItem');
             const testModeMenuItem = $('testModeMenuItem');
+            const placementModeMenuItem = $('placementModeMenuItem');
             const suspendMenuItem = $('suspendMenuItem');
             const settingsMenuItem = $('settingsMenuItem');
             const debugModeMenuItem = $('debugModeMenuItem');
@@ -5547,10 +6049,28 @@
                         return;
                     }
 
+                    if (placementState) {
+                        showToast('Exit Placement Mode before starting Test Mode', 'error');
+                        return;
+                    }
+
                     if (testState) {
                         exitTestMode();
                     } else {
                         startTestMode();
+                    }
+                });
+            }
+
+            if (placementModeMenuItem) {
+                placementModeMenuItem.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (menuDropdown) menuDropdown.hidden = true;
+                    closeAllSubmenus();
+                    if (placementState) {
+                        exitPlacementMode();
+                    } else {
+                        startPlacementMode();
                     }
                 });
             }
@@ -5929,6 +6449,7 @@
                     payload = null;
                     settings = [];
                     testState = null;
+                    placementState = null;
 
                     // Hide quiz/done areas to clear background
                     $('quizArea').classList.add('hidden');
