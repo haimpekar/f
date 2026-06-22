@@ -1,4 +1,4 @@
-# GitHub Monorepo Subfolder Synchronizer
+# GitHub Monorepo Subfolder Synchronizer ha ha ha
 
 This folder contains a Python-only synchronizer. There is no BAT file and no PowerShell file.
 
